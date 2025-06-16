@@ -17,14 +17,15 @@
     "@dfinity/agent": "^0.19.2",
     "@dfinity/candid": "^0.19.2",
     "@dfinity/principal": "^0.19.2",
+    "leaflet": "^1.9.4",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "leaflet": "^1.9.4"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.4",
+    "@types/node": "^24.0.3",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
-    "@types/leaflet": "^1.9.4",
     "@vitejs/plugin-react": "^4.0.3",
     "typescript": "^5.0.2",
     "vite": "^4.4.5"
@@ -43,4 +44,4 @@
   ],
   "author": "ICP Developer",
   "license": "MIT"
-} 
+}
