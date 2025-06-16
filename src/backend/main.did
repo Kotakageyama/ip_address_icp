@@ -1,0 +1,19 @@
+type IpInfo = record {
+    city : text;
+    country : text;
+    ip : text;
+    isp : text;
+    latitude : text;
+    longitude : text;
+    region : text;
+    timestamp : int;
+    timezone : text
+};
+
+service : {
+    getAllVisits : () -> (vec IpInfo) query;
+    getLatestVisits : (nat) -> (vec IpInfo) query;
+    getStats : () -> (record { totalVisits : nat; uniqueCountries : nat }) query;
+    recordVisit : (IpInfo) -> (bool);
+    whoami : () -> (text) query
+}

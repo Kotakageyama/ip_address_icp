@@ -3,7 +3,8 @@
   "canisters": {
     "ip_address_backend": {
       "type": "motoko",
-      "main": "src/backend/main.mo"
+      "main": "src/backend/main.mo",
+      "candid": "src/backend/main.did"
     },
     "ip_address_frontend": {
       "type": "custom",
@@ -11,7 +12,9 @@
       "root": "dist",
       "source": [
         "dist"
-      ]
+      ],
+      "candid": "",
+      "wasm": ""
     }
   },
   "networks": {
