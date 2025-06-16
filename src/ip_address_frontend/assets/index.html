@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP アドレス位置情報トラッカー - Internet Computer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🌍 IP アドレス位置情報トラッカー</h1>
+            <p class="subtitle">Internet Computer上で完全分散動作</p>
+        </header>
+
+        <main>
+            <!-- 現在の訪問者情報 -->
+            <section class="current-visitor">
+                <h2>🔍 あなたの情報</h2>
+                <div class="info-card" id="current-info">
+                    <div class="loading">位置情報を取得中...</div>
+                </div>
+            </section>
+
+            <!-- マップ表示 -->
+            <section class="map-section">
+                <h2>🗺️ 位置情報マップ</h2>
+                <div id="map"></div>
+            </section>
+
+            <!-- 統計情報 -->
+            <section class="stats">
+                <h2>📊 統計情報</h2>
+                <div class="stats-grid" id="stats-info">
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-visits">-</div>
+                        <div class="stat-label">総訪問数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="unique-countries">-</div>
+                        <div class="stat-label">異なる国</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 最近の訪問者 -->
+            <section class="recent-visits">
+                <h2>👥 最近の訪問者</h2>
+                <div class="visits-list" id="visits-list">
+                    <div class="loading">データを読み込み中...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>
+                <strong>Internet Computer</strong> 上で完全分散動作 |
+                Canister ID: <span id="canister-id">取得中...</span>
+            </p>
+        </footer>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+
+</html>

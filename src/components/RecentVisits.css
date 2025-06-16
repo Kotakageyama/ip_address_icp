@@ -1,0 +1,100 @@
+.recent-visits {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.recent-visits h2 {
+    font-size: 1.4rem;
+    margin-bottom: 20px;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.visits-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.visit-item {
+    background: linear-gradient(135deg, #fd79a8 0%, #e84393 100%);
+    color: white;
+    padding: 20px;
+    margin-bottom: 15px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(253, 121, 168, 0.3);
+    transition: transform 0.3s ease;
+}
+
+.visit-item:hover {
+    transform: translateY(-2px);
+}
+
+.visit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.visit-ip {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.visit-time {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.visit-location {
+    font-size: 0.95rem;
+    opacity: 0.9;
+    margin-bottom: 5px;
+}
+
+.visit-location:last-child {
+    margin-bottom: 0;
+}
+
+.loading {
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+    color: #666;
+}
+
+/* スクロールバーのスタイリング */
+.visits-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.visits-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.visits-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+
+.visits-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+    .recent-visits {
+        padding: 20px;
+    }
+
+    .visit-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+}
