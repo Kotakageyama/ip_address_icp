@@ -1,9 +1,29 @@
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { IpInfo, Stats } from '../types';
 
-// ローカル開発環境用の設定
+// 環境に応じたホスト設定
+const getHost = () => {
+  // ローカル開発環境変数が設定されている場合
+  if (import.meta.env.VITE_LOCAL_BACKEND_HOST) {
+    return import.meta.env.VITE_LOCAL_BACKEND_HOST;
+  }
+  
+  // 開発モード（npm run dev）の場合
+  if (import.meta.env.DEV) {
+    return 'http://localhost:4943';
+  }
+  
+  // プロダクションでもローカルネットワーク用の環境変数がある場合
+  if (import.meta.env.VITE_IS_LOCAL_NETWORK === 'true') {
+    return 'http://localhost:4943';
+  }
+  
+  // 本番環境
+  return 'https://ic0.app';
+};
+
 const agent = new HttpAgent({
-  host: import.meta.env.DEV ? 'http://localhost:4943' : 'https://ic0.app'
+  host: getHost()
 });
 
 // ローカル開発環境では証明書を検証しない
