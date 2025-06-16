@@ -1,5 +1,5 @@
 import React from 'react';
-import { IpInfo } from '../types';
+import { IpInfo } from '../../types';
 import './CurrentVisitor.css';
 
 interface CurrentVisitorProps {

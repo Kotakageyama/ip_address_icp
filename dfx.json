@@ -6,9 +6,11 @@
       "main": "src/backend/main.mo"
     },
     "ip_address_frontend": {
-      "type": "assets",
+      "type": "custom",
+      "build": "npm run build",
+      "root": "dist",
       "source": [
-        "src/ip_address_frontend/assets"
+        "dist"
       ]
     }
   },

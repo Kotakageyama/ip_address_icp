@@ -1,5 +1,5 @@
 import React from 'react';
-import { IpInfo } from '../types';
+import { IpInfo } from '../../types';
 import './RecentVisits.css';
 
 interface RecentVisitsProps {
@@ -22,7 +22,7 @@ const RecentVisits: React.FC<RecentVisitsProps> = ({ visits }) => {
     <section className="recent-visits">
       <h2>👥 最近の訪問者</h2>
       <div className="visits-list">
-        {visits.map((visit, index) => {
+        {visits.map((visit) => {
           const visitTime = new Date(Number(visit.timestamp) / 1000000);
           return (
             <div key={`${visit.ip}-${visit.timestamp}`} className="visit-item">

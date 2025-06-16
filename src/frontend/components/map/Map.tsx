@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { IpInfo } from '../types';
+import { IpInfo } from '../../types';
 import './Map.css';
 
 interface MapProps {
