@@ -3,7 +3,7 @@
   "canisters": {
     "ip_address_backend": {
       "type": "motoko",
-      "main": "src/ip_address_backend/main.mo"
+      "main": "src/backend/main.mo"
     },
     "ip_address_frontend": {
       "type": "assets",

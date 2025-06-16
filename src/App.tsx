@@ -1,68 +1,23 @@
-import React, { useEffect, useState } from 'react';
-import Header from './components/Header';
-import CurrentVisitor from './components/CurrentVisitor';
-import Map from './components/Map';
-import Stats from './components/Stats';
-import RecentVisits from './components/RecentVisits';
-import Footer from './components/Footer';
-import { IpInfo, Stats as StatsType } from './types';
-import { IPService } from './services/ipService';
-import { ICPService } from './services/icpService';
+import React from 'react';
+import Header from './frontend/components/layout/Header';
+import CurrentVisitor from './frontend/components/visitor/CurrentVisitor';
+import Map from './frontend/components/map/Map';
+import Stats from './frontend/components/stats/Stats';
+import RecentVisits from './frontend/components/visitor/RecentVisits';
+import Footer from './frontend/components/layout/Footer';
+import { useIpLocation } from './frontend/hooks/useIpLocation';
+import { useStats } from './frontend/hooks/useStats';
+import { useRecentVisits } from './frontend/hooks/useRecentVisits';
+import { ICPService } from './frontend/services/icpService';
 import './App.css';
 
 const App: React.FC = () => {
-  const [currentIpInfo, setCurrentIpInfo] = useState<IpInfo | null>(null);
-  const [stats, setStats] = useState<StatsType | null>(null);
-  const [recentVisits, setRecentVisits] = useState<IpInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { currentIpInfo, loading: ipLoading, error: ipError } = useIpLocation();
+  const { stats } = useStats();
+  const { recentVisits } = useRecentVisits(10);
 
-  useEffect(() => {
-    initializeApp();
-  }, []);
-
-  const initializeApp = async () => {
-    try {
-      setLoading(true);
-      
-      // IPアドレス情報を取得
-      const ipInfo = await IPService.fetchIpInfo();
-      if (ipInfo) {
-        setCurrentIpInfo(ipInfo);
-        
-        // ICPに記録（可能な場合）
-        if (ICPService.isAvailable()) {
-          try {
-            await ICPService.recordVisit(ipInfo);
-            console.log('訪問情報をCanisterに記録しました');
-          } catch (error) {
-            console.warn('Canisterへの記録に失敗しました:', error);
-          }
-        }
-      }
-
-      // 統計情報と最近の訪問者を取得
-      if (ICPService.isAvailable()) {
-        try {
-          const [statsData, visitsData] = await Promise.all([
-            ICPService.getStats(),
-            ICPService.getLatestVisits(10)
-          ]);
-          
-          setStats(statsData);
-          setRecentVisits(visitsData);
-        } catch (error) {
-          console.warn('ICPからのデータ取得に失敗しました:', error);
-        }
-      }
-
-    } catch (error) {
-      console.error('アプリケーションの初期化に失敗しました:', error);
-      setError('アプリケーションの初期化に失敗しました');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = ipLoading;
+  const error = ipError;
 
   if (loading) {
     return (
@@ -81,7 +36,7 @@ const App: React.FC = () => {
         <div className="error-screen">
           <h2>エラーが発生しました</h2>
           <p>{error}</p>
-          <button onClick={initializeApp}>再試行</button>
+          <button onClick={() => window.location.reload()}>再試行</button>
         </div>
       </div>
     );
