@@ -7,14 +7,10 @@
       "candid": "src/backend/main.did"
     },
     "ip_address_frontend": {
-      "type": "custom",
-      "build": "npm run build",
-      "root": "dist",
+      "type": "assets",
       "source": [
-        "dist"
-      ],
-      "candid": "",
-      "wasm": ""
+        "dist/"
+      ]
     }
   },
   "networks": {
