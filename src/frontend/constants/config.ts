@@ -6,7 +6,7 @@ export const API_CONFIG = {
 	IP_APIS: [
 		"https://ipapi.co/json/",
 		"https://ip-api.com/json/",
-		// 'https://ipinfo.io/json' // ICP環境のCSPでブロックされるため削除
+		"https://ipinfo.io/json",
 	],
 
 	// API タイムアウト（ミリ秒）
