@@ -12,9 +12,9 @@ import Iter "mo:base/Iter";
 import Option "mo:base/Option";
 import Result "mo:base/Result";
 
-// HTTPS Outcalls用のICモジュール定義
-module IC = {
-  public type http_request_args = {
+actor IpAddressBackend {
+  // HTTPS Outcalls用の型定義
+  public type HttpRequestArgs = {
     url : Text;
     max_response_bytes : ?Nat64;
     headers : [{ name : Text; value : Text }];
@@ -22,28 +22,26 @@ module IC = {
     method : { #get; #head; #post };
     transform : ?{
       function : shared query ({
-        response : http_request_result;
+        response : HttpRequestResult;
         context : Blob;
-      }) -> async http_request_result;
+      }) -> async HttpRequestResult;
       context : Blob;
     };
   };
 
-  public type http_request_result = {
+  public type HttpRequestResult = {
     status : Nat;
     headers : [{ name : Text; value : Text }];
     body : Blob;
   };
 
-  public func http_request(args : http_request_args) : async http_request_result {
+  // HTTPS Outcall実行用のプライベート関数
+  private func httpRequest(args : HttpRequestArgs) : async HttpRequestResult {
     let ic : actor {
-      http_request : http_request_args -> async http_request_result;
+      http_request : HttpRequestArgs -> async HttpRequestResult;
     } = actor ("aaaaa-aa");
     await ic.http_request(args);
   };
-};
-
-actor IpAddressBackend {
   // IPアドレス情報の型定義
   public type IpInfo = {
     ip : Text;
@@ -88,7 +86,7 @@ actor IpAddressBackend {
   public func fetchIpInfo(ip : Text) : async Result.Result<IpInfo, Text> {
     try {
       // IPv6をサポートするipapi.coを使用
-      let http_request : IC.http_request_args = {
+      let request : HttpRequestArgs = {
         url = "https://ipapi.co/" # ip # "/json/";
         max_response_bytes = ?2000; // 2KB制限
         headers = [
@@ -107,7 +105,7 @@ actor IpAddressBackend {
       Cycles.add<system>(50_000_000);
 
       // HTTPリクエストを実行
-      let http_response : IC.http_request_result = await IC.http_request(http_request);
+      let http_response : HttpRequestResult = await httpRequest(request);
 
       // レスポンスのステータスコードをチェック
       if (http_response.status != 200) {
@@ -134,10 +132,10 @@ actor IpAddressBackend {
   // レスポンスの変換関数（コンセンサス用）
   public query func transform(
     args : {
-      response : IC.http_request_result;
+      response : HttpRequestResult;
       context : Blob;
     }
-  ) : async IC.http_request_result {
+  ) : async HttpRequestResult {
     {
       status = args.response.status;
       body = args.response.body;

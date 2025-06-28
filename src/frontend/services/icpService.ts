@@ -107,30 +107,6 @@ const idlFactory = ({ IDL }: any) => {
 		// HTTPS Outcalls関連の新しいメソッド
 		fetchIpInfo: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
 		recordVisitByIp: IDL.Func([IDL.Text], [ResultBoolIDL], []),
-		transform: IDL.Func(
-			[
-				IDL.Record({
-					response: IDL.Record({
-						status: IDL.Nat,
-						headers: IDL.Vec(
-							IDL.Record({ name: IDL.Text, value: IDL.Text })
-						),
-						body: IDL.Vec(IDL.Nat8),
-					}),
-					context: IDL.Vec(IDL.Nat8),
-				}),
-			],
-			[
-				IDL.Record({
-					status: IDL.Nat,
-					headers: IDL.Vec(
-						IDL.Record({ name: IDL.Text, value: IDL.Text })
-					),
-					body: IDL.Vec(IDL.Nat8),
-				}),
-			],
-			["query"]
-		),
 	});
 };
 
