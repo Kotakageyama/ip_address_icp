@@ -1,8 +1,8 @@
-import Debug "mo:base/Debug";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
-import Iter "mo:base/Iter";
 import Text "mo:base/Text";
+import Buffer "mo:base/Buffer";
+import Int "mo:base/Int";
 
 actor IpAddressBackend {
   // IPアドレス情報の型定義
@@ -45,8 +45,24 @@ actor IpAddressBackend {
     if (total <= count) {
       visitHistory;
     } else {
-      let start = total - count;
-      Array.subArray(visitHistory, start, count);
+      // Int型で計算してからNatに変換してトラップを回避
+      let totalInt : Int = total;
+      let countInt : Int = count;
+      let skipInt = totalInt - countInt;
+      let targetSkip = Int.abs(skipInt);
+      
+      let buffer = Buffer.Buffer<IpInfo>(count);
+      var skipCount = 0;
+      
+      for (item in visitHistory.vals()) {
+        if (skipCount < targetSkip) {
+          skipCount += 1;
+        } else {
+          buffer.add(item);
+        };
+      };
+      
+      Buffer.toArray(buffer);
     };
   };
 
