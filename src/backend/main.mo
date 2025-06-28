@@ -5,6 +5,43 @@ import Buffer "mo:base/Buffer";
 import Int "mo:base/Int";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
+import Cycles "mo:base/ExperimentalCycles";
+import Blob "mo:base/Blob";
+import Char "mo:base/Char";
+import Iter "mo:base/Iter";
+import Option "mo:base/Option";
+import Result "mo:base/Result";
+
+// HTTPS Outcalls用のICモジュール定義
+module IC = {
+  public type http_request_args = {
+    url : Text;
+    max_response_bytes : ?Nat64;
+    headers : [{ name : Text; value : Text }];
+    body : ?Blob;
+    method : { #get; #head; #post };
+    transform : ?{
+      function : shared query ({
+        response : http_request_result;
+        context : Blob;
+      }) -> async http_request_result;
+      context : Blob;
+    };
+  };
+
+  public type http_request_result = {
+    status : Nat;
+    headers : [{ name : Text; value : Text }];
+    body : Blob;
+  };
+
+  public func http_request(args : http_request_args) : async http_request_result {
+    let ic : actor {
+      http_request : http_request_args -> async http_request_result;
+    } = actor ("aaaaa-aa");
+    await ic.http_request(args);
+  };
+};
 
 actor IpAddressBackend {
   // IPアドレス情報の型定義
@@ -47,6 +84,125 @@ actor IpAddressBackend {
     Debug.print("Preupgrade: " # Int.toText(stableVisits.size()) # " 件のデータを保存しました");
   };
 
+  // HTTPS Outcallsを使用してIPアドレス情報を取得
+  public func fetchIpInfo(ip : Text) : async Result.Result<IpInfo, Text> {
+    try {
+      // IPv6をサポートするipapi.coを使用
+      let http_request : IC.http_request_args = {
+        url = "https://ipapi.co/" # ip # "/json/";
+        max_response_bytes = ?2000; // 2KB制限
+        headers = [
+          { name = "User-Agent"; value = "ICP-Canister/1.0" },
+          { name = "Accept"; value = "application/json" },
+        ];
+        body = null;
+        method = #get;
+        transform = ?{
+          function = transform;
+          context = Blob.fromArray([]);
+        };
+      };
+
+      // HTTPS outcall用に約50M cyclsを追加
+      Cycles.add<system>(50_000_000);
+
+      // HTTPリクエストを実行
+      let http_response : IC.http_request_result = await IC.http_request(http_request);
+
+      // レスポンスのステータスコードをチェック
+      if (http_response.status != 200) {
+        return #err("HTTP Error: " # Nat.toText(http_response.status));
+      };
+
+      // レスポンスボディをテキストに変換
+      let decoded_text : Text = switch (Text.decodeUtf8(http_response.body)) {
+        case (null) { return #err("Failed to decode response") };
+        case (?text) { text };
+      };
+
+      // JSONからIP情報を抽出
+      switch (parseIpInfo(decoded_text)) {
+        case (#ok(ipInfo)) { #ok(ipInfo) };
+        case (#err(msg)) { #err(msg) };
+      };
+
+    } catch (error) {
+      #err("Request failed");
+    };
+  };
+
+  // レスポンスの変換関数（コンセンサス用）
+  public query func transform(
+    args : {
+      response : IC.http_request_result;
+      context : Blob;
+    }
+  ) : async IC.http_request_result {
+    {
+      status = args.response.status;
+      body = args.response.body;
+      headers = []; // ヘッダーは除外してコンセンサスを容易にする
+    };
+  };
+
+  // 簡単なJSONパーサー（IP情報用）
+  private func parseIpInfo(json : Text) : Result.Result<IpInfo, Text> {
+    let ip = extractJsonValue(json, "ip");
+    let country = extractJsonValue(json, "country_name");
+    let region = extractJsonValue(json, "region");
+    let city = extractJsonValue(json, "city");
+    let latitude = extractJsonValue(json, "latitude");
+    let longitude = extractJsonValue(json, "longitude");
+    let timezone = extractJsonValue(json, "timezone");
+    let org = extractJsonValue(json, "org");
+
+    if (ip == "" or country == "") {
+      return #err("Invalid JSON response");
+    };
+
+    let ipInfo : IpInfo = {
+      ip = ip;
+      country = country;
+      region = region;
+      city = city;
+      latitude = latitude;
+      longitude = longitude;
+      timezone = timezone;
+      isp = org;
+      timestamp = Time.now();
+    };
+
+    #ok(ipInfo);
+  };
+
+  // JSONから特定のフィールドの値を抽出（簡単な実装）
+  private func extractJsonValue(json : Text, field : Text) : Text {
+    let pattern = "\"" # field # "\":\"";
+    if (Text.contains(json, #text pattern)) {
+      // パターンで分割
+      let parts = Text.split(json, #text pattern);
+      switch (parts.next()) {
+        case null { "" };
+        case (?_) {
+          // 次の部分を取得
+          switch (parts.next()) {
+            case null { "" };
+            case (?remaining) {
+              // クォートまでの部分を取得
+              let endParts = Text.split(remaining, #text "\"");
+              switch (endParts.next()) {
+                case null { "" };
+                case (?value) { value };
+              };
+            };
+          };
+        };
+      };
+    } else {
+      "";
+    };
+  };
+
   // IPアドレス情報を記録（効率的なBuffer追加）
   public func recordVisit(ipInfo : IpInfo) : async Bool {
     let newInfo = {
@@ -68,6 +224,19 @@ actor IpAddressBackend {
 
     Debug.print("新しい訪問を記録: " # newInfo.country # " から " # newInfo.ip);
     true;
+  };
+
+  // IPアドレスから自動的に情報を取得して記録
+  public func recordVisitByIp(ip : Text) : async Result.Result<Bool, Text> {
+    switch (await fetchIpInfo(ip)) {
+      case (#ok(ipInfo)) {
+        let result = await recordVisit(ipInfo);
+        #ok(result);
+      };
+      case (#err(msg)) {
+        #err(msg);
+      };
+    };
   };
 
   // 最新の訪問記録を取得（ページング対応）

@@ -64,6 +64,16 @@ const idlFactory = ({ IDL }: any) => {
 		uniqueCountries: IDL.Nat,
 	});
 
+	const ResultBoolIDL = IDL.Variant({
+		ok: IDL.Bool,
+		err: IDL.Text,
+	});
+
+	const ResultIpInfoIDL = IDL.Variant({
+		ok: IpInfoIDL,
+		err: IDL.Text,
+	});
+
 	return IDL.Service({
 		recordVisit: IDL.Func([IpInfoIDL], [IDL.Bool], []),
 		getLatestVisits: IDL.Func([IDL.Nat], [IDL.Vec(IpInfoIDL)], ["query"]),
@@ -93,6 +103,34 @@ const idlFactory = ({ IDL }: any) => {
 		),
 		clearAllData: IDL.Func([], [IDL.Bool], []),
 		getMemoryStats: IDL.Func([], [MemoryStatsIDL], ["query"]),
+
+		// HTTPS Outcalls関連の新しいメソッド
+		fetchIpInfo: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
+		recordVisitByIp: IDL.Func([IDL.Text], [ResultBoolIDL], []),
+		transform: IDL.Func(
+			[
+				IDL.Record({
+					response: IDL.Record({
+						status: IDL.Nat,
+						headers: IDL.Vec(
+							IDL.Record({ name: IDL.Text, value: IDL.Text })
+						),
+						body: IDL.Vec(IDL.Nat8),
+					}),
+					context: IDL.Vec(IDL.Nat8),
+				}),
+			],
+			[
+				IDL.Record({
+					status: IDL.Nat,
+					headers: IDL.Vec(
+						IDL.Record({ name: IDL.Text, value: IDL.Text })
+					),
+					body: IDL.Vec(IDL.Nat8),
+				}),
+			],
+			["query"]
+		),
 	});
 };
 
@@ -113,6 +151,9 @@ try {
 	console.warn("Backend Actorの初期化に失敗しました:", error);
 }
 
+// HTTPS Outcalls用の結果型
+type ResultType<T> = { ok: T } | { err: string };
+
 export class ICPService {
 	static async recordVisit(ipInfo: IpInfo): Promise<boolean> {
 		if (!backendActor) {
@@ -124,6 +165,49 @@ export class ICPService {
 			return result;
 		} catch (error) {
 			console.error("訪問記録の保存に失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// HTTPS Outcallsを使用してIPアドレス情報を取得
+	static async fetchIpInfo(ip: string): Promise<IpInfo> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+
+		try {
+			const result: ResultType<IpInfo> = await backendActor.fetchIpInfo(
+				ip
+			);
+
+			if ("ok" in result) {
+				return result.ok;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("IP情報の取得に失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// IPアドレスから自動的に情報を取得して記録
+	static async recordVisitByIp(ip: string): Promise<boolean> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+
+		try {
+			const result: ResultType<boolean> =
+				await backendActor.recordVisitByIp(ip);
+
+			if ("ok" in result) {
+				return result.ok;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("IP情報による訪問記録の保存に失敗しました:", error);
 			throw error;
 		}
 	}
