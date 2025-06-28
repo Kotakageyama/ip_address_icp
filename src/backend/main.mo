@@ -5,11 +5,7 @@ import Buffer "mo:base/Buffer";
 import Int "mo:base/Int";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
-import Cycles "mo:base/ExperimentalCycles";
 import Blob "mo:base/Blob";
-import Char "mo:base/Char";
-import Iter "mo:base/Iter";
-import Option "mo:base/Option";
 import Result "mo:base/Result";
 
 actor IpAddressBackend {
@@ -101,11 +97,8 @@ actor IpAddressBackend {
         };
       };
 
-      // HTTPS outcall用に約50M cyclsを追加
-      Cycles.add<system>(50_000_000);
-
-      // HTTPリクエストを実行
-      let http_response : HttpRequestResult = await httpRequest(request);
+      // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
+      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
 
       // レスポンスのステータスコードをチェック
       if (http_response.status != 200) {
@@ -124,7 +117,7 @@ actor IpAddressBackend {
         case (#err(msg)) { #err(msg) };
       };
 
-    } catch (error) {
+    } catch (_) {
       #err("Request failed");
     };
   };
@@ -234,6 +227,59 @@ actor IpAddressBackend {
       case (#err(msg)) {
         #err(msg);
       };
+    };
+  };
+
+  // マップタイルを取得（OpenStreetMap）
+  public func fetchMapTile(z : Nat, x : Nat, y : Nat) : async Result.Result<Blob, Text> {
+    try {
+      // OpenStreetMapのタイルサーバーを使用
+      let url = "https://tile.openstreetmap.org/" # Nat.toText(z) # "/" # Nat.toText(x) # "/" # Nat.toText(y) # ".png";
+
+      let request : HttpRequestArgs = {
+        url = url;
+        max_response_bytes = ?1048576; // 1MB制限（タイル画像用）
+        headers = [
+          { name = "User-Agent"; value = "ICP-Canister/1.0" },
+          { name = "Accept"; value = "image/png,image/*" },
+        ];
+        body = null;
+        method = #get;
+        transform = ?{
+          function = transformTile;
+          context = Blob.fromArray([]);
+        };
+      };
+
+      // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
+      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
+
+      // レスポンスのステータスコードをチェック
+      if (http_response.status != 200) {
+        return #err("HTTP Error: " # Nat.toText(http_response.status));
+      };
+
+      #ok(http_response.body);
+
+    } catch (_) {
+      #err("Map tile request failed");
+    };
+  };
+
+  // マップタイル用のレスポンス変換関数
+  public query func transformTile(
+    args : {
+      response : HttpRequestResult;
+      context : Blob;
+    }
+  ) : async HttpRequestResult {
+    {
+      status = args.response.status;
+      body = args.response.body;
+      headers = [
+        { name = "Content-Type"; value = "image/png" },
+        { name = "Cache-Control"; value = "public, max-age=3600" },
+      ];
     };
   };
 

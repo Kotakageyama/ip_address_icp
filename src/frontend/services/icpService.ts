@@ -107,6 +107,13 @@ const idlFactory = ({ IDL }: any) => {
 		// HTTPS Outcalls関連の新しいメソッド
 		fetchIpInfo: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
 		recordVisitByIp: IDL.Func([IDL.Text], [ResultBoolIDL], []),
+
+		// マップタイル取得機能
+		fetchMapTile: IDL.Func(
+			[IDL.Nat, IDL.Nat, IDL.Nat],
+			[IDL.Variant({ ok: IDL.Vec(IDL.Nat8), err: IDL.Text })],
+			[]
+		),
 	});
 };
 
@@ -184,6 +191,31 @@ export class ICPService {
 			}
 		} catch (error) {
 			console.error("IP情報による訪問記録の保存に失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// マップタイルを取得
+	static async fetchMapTile(
+		z: number,
+		x: number,
+		y: number
+	): Promise<Uint8Array> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+
+		try {
+			const result: ResultType<Uint8Array> =
+				await backendActor.fetchMapTile(z, x, y);
+
+			if ("ok" in result) {
+				return result.ok;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("マップタイル取得に失敗しました:", error);
 			throw error;
 		}
 	}
