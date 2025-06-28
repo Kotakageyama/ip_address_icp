@@ -114,6 +114,13 @@ const idlFactory = ({ IDL }: any) => {
 			[IDL.Variant({ ok: IDL.Vec(IDL.Nat8), err: IDL.Text })],
 			[]
 		),
+
+		// グローバルIPアドレスをICPのOUTCALLSで取得
+		fetchGlobalIp: IDL.Func(
+			[],
+			[IDL.Variant({ ok: IDL.Text, err: IDL.Text })],
+			[]
+		),
 	});
 };
 
@@ -359,6 +366,25 @@ export class ICPService {
 			};
 		} catch (error) {
 			console.error("ヘルスチェックに失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// グローバルIPアドレスをICPのOUTCALLSで取得
+	static async fetchGlobalIp(): Promise<string> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+		try {
+			const result: { ok?: string; err?: string } =
+				await backendActor.fetchGlobalIp();
+			if ("ok" in result) {
+				return result.ok as string;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("グローバルIPアドレスの取得に失敗しました:", error);
 			throw error;
 		}
 	}

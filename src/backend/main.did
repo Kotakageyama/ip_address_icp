@@ -46,5 +46,7 @@ service : {
     recordVisitByIp : (text) -> (variant { ok : bool; err : text });
 
     // マップタイル取得機能
-    fetchMapTile : (nat, nat, nat) -> (variant { ok : blob; err : text })
+    fetchMapTile : (nat, nat, nat) -> (variant { ok : blob; err : text });
+
+    fetchGlobalIp : () -> async Result.Result<Text, Text>
 }

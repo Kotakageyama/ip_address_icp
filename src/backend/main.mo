@@ -473,4 +473,45 @@ actor IpAddressBackend {
   public query func whoami() : async Text {
     "IP Address Tracker Canister on Internet Computer (Scalable Version v2.0)";
   };
+
+  // クライアントのグローバルIPアドレスを取得（ipifyを利用）
+  public func fetchGlobalIp() : async Result.Result<Text, Text> {
+    try {
+      let request : HttpRequestArgs = {
+        url = "https://api64.ipify.org?format=json";
+        max_response_bytes = ?200;
+        headers = [
+          { name = "User-Agent"; value = "ICP-Canister/1.0" },
+          { name = "Accept"; value = "application/json" },
+        ];
+        body = null;
+        method = #get;
+        transform = ?{
+          function = transform;
+          context = Blob.fromArray([]);
+        };
+      };
+
+      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
+
+      if (http_response.status != 200) {
+        return #err("HTTP Error: " # Nat.toText(http_response.status));
+      };
+
+      let decoded_text : Text = switch (Text.decodeUtf8(http_response.body)) {
+        case (null) { return #err("Failed to decode response") };
+        case (?text) { text };
+      };
+
+      // 例: {"ip":"xxx.xxx.xxx.xxx"}
+      let ip = extractJsonValue(decoded_text, "ip");
+      if (ip == "") {
+        return #err("Invalid JSON response");
+      };
+      #ok(ip);
+
+    } catch (_) {
+      #err("Request failed");
+    };
+  }
 };

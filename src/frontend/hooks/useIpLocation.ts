@@ -66,7 +66,11 @@ export const useIpLocation = () => {
 	// クライアントIPを軽量に取得するヘルパー関数
 	const getClientIp = async (): Promise<string> => {
 		try {
-			// 軽量なIP取得サービスを使用
+			// ICPのOUTCALLSでグローバルIPを取得
+			if (ICPService.isAvailable()) {
+				return await ICPService.fetchGlobalIp();
+			}
+			// フォールバック: 直接fetch（ローカル開発用）
 			const response = await fetch("https://api64.ipify.org?format=json");
 			const data = await response.json();
 			return data.ip || "127.0.0.1";
