@@ -10,10 +10,34 @@ type IpInfo = record {
     timezone : text
 };
 
+type PagedVisitsResult = record {
+    visits : vec IpInfo;
+    totalPages : nat;
+    currentPage : nat;
+    totalItems : nat;
+};
+
+type CountryStats = record {
+    country : text;
+    visitCount : nat;
+};
+
+type MemoryStats = record {
+    totalVisits : nat;
+    bufferCapacity : nat;
+    uniqueCountries : nat;
+};
+
 service : {
     getAllVisits : () -> (vec IpInfo) query;
     getLatestVisits : (nat) -> (vec IpInfo) query;
     getStats : () -> (record { totalVisits : nat; uniqueCountries : nat }) query;
     recordVisit : (IpInfo) -> (bool);
-    whoami : () -> (text) query
+    whoami : () -> (text) query;
+    
+    // 新しいスケーラブル機能
+    getVisitsPaged : (nat, nat) -> (PagedVisitsResult) query;
+    getCountryStats : () -> (vec record { text; nat }) query;
+    clearAllData : () -> (bool);
+    getMemoryStats : () -> (MemoryStats) query;
 }
