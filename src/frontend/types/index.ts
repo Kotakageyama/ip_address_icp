@@ -29,9 +29,9 @@ export interface CountryStats {
 }
 
 export interface MemoryStats {
-	totalVisits: bigint;
-	bufferCapacity: bigint;
-	uniqueCountries: bigint;
+	totalVisits: number;
+	bufferCapacity: number;
+	uniqueCountries: number;
 }
 
 export interface ApiIpInfo {
@@ -50,4 +50,10 @@ export interface ApiIpInfo {
 	isp?: string;
 	query?: string;
 	loc?: string;
+}
+
+export interface Marker {
+	lat: string;
+	lon: string;
+	color: string;
 }

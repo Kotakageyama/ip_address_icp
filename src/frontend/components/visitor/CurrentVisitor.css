@@ -1,66 +1,66 @@
 .current-visitor {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    padding: 30px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+	background: rgba(255, 255, 255, 0.95);
+	backdrop-filter: blur(10px);
+	border-radius: 20px;
+	padding: 30px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+	border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .current-visitor h2 {
-    font-size: 1.4rem;
-    margin-bottom: 20px;
-    color: #2c3e50;
-    font-weight: 500;
+	font-size: 1.4rem;
+	margin-bottom: 20px;
+	color: #2c3e50;
+	font-weight: 500;
 }
 
-.info-card {
-    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
-    color: white;
-    padding: 25px;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(116, 185, 255, 0.3);
+.visitor-info-card {
+	background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+	color: white;
+	padding: 25px;
+	border-radius: 15px;
+	box-shadow: 0 4px 15px rgba(116, 185, 255, 0.3);
 }
 
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-top: 15px;
+.visitor-info-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 15px;
+	margin-top: 15px;
 }
 
-.info-item {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 15px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+.visitor-info-item {
+	background: rgba(255, 255, 255, 0.1);
+	padding: 15px;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.info-label {
-    font-size: 0.9rem;
-    opacity: 0.8;
-    margin-bottom: 5px;
+.visitor-info-label {
+	font-size: 0.9rem;
+	opacity: 0.8;
+	margin-bottom: 5px;
 }
 
-.info-value {
-    font-size: 1.1rem;
-    font-weight: 500;
+.visitor-info-value {
+	font-size: 1.1rem;
+	font-weight: 500;
 }
 
 .loading {
-    text-align: center;
-    padding: 20px;
-    font-style: italic;
-    color: rgba(255, 255, 255, 0.8);
+	text-align: center;
+	padding: 20px;
+	font-style: italic;
+	color: rgba(255, 255, 255, 0.8);
 }
 
 /* レスポンシブデザイン */
 @media (max-width: 768px) {
-    .current-visitor {
-        padding: 20px;
-    }
+	.current-visitor {
+		padding: 20px;
+	}
 
-    .info-grid {
-        grid-template-columns: 1fr;
-    }
+	.visitor-info-grid {
+		grid-template-columns: 1fr;
+	}
 }

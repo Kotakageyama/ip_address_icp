@@ -5,6 +5,7 @@ import {
 	PagedVisitsResult,
 	CountryStats,
 	MemoryStats,
+	Marker,
 } from "../types";
 
 // 環境に応じたホスト設定
@@ -33,7 +34,7 @@ const agent = new HttpAgent({
 });
 
 // ローカル開発環境では証明書を検証しない
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_BACKEND_HOST) {
 	agent.fetchRootKey();
 }
 
@@ -51,6 +52,12 @@ const idlFactory = ({ IDL }: any) => {
 		timestamp: IDL.Int,
 	});
 
+	const MarkerIDL = IDL.Record({
+		lat: IDL.Text,
+		lon: IDL.Text,
+		color: IDL.Text,
+	});
+
 	const PagedVisitsResultIDL = IDL.Record({
 		visits: IDL.Vec(IpInfoIDL),
 		totalPages: IDL.Nat,
@@ -62,6 +69,16 @@ const idlFactory = ({ IDL }: any) => {
 		totalVisits: IDL.Nat,
 		bufferCapacity: IDL.Nat,
 		uniqueCountries: IDL.Nat,
+	});
+
+	const ResultBoolIDL = IDL.Variant({
+		ok: IDL.Bool,
+		err: IDL.Text,
+	});
+
+	const ResultIpInfoIDL = IDL.Variant({
+		ok: IpInfoIDL,
+		err: IDL.Text,
 	});
 
 	return IDL.Service({
@@ -93,6 +110,38 @@ const idlFactory = ({ IDL }: any) => {
 		),
 		clearAllData: IDL.Func([], [IDL.Bool], []),
 		getMemoryStats: IDL.Func([], [MemoryStatsIDL], ["query"]),
+
+		// HTTPS Outcalls関連の新しいメソッド
+		fetchIpInfo: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
+		recordVisitByIp: IDL.Func([IDL.Text], [ResultBoolIDL], []),
+
+		// マップタイル取得機能
+		fetchMapTile: IDL.Func(
+			[IDL.Nat, IDL.Nat, IDL.Nat],
+			[IDL.Variant({ ok: IDL.Vec(IDL.Nat8), err: IDL.Text })],
+			[]
+		),
+
+		// グローバルIPアドレスをICPのOUTCALLSで取得
+		fetchGlobalIp: IDL.Func(
+			[],
+			[IDL.Variant({ ok: IDL.Text, err: IDL.Text })],
+			[]
+		),
+
+		// 静的マップ画像取得機能
+		getStaticMap: IDL.Func(
+			[
+				IDL.Text, // lat
+				IDL.Text, // lon
+				IDL.Opt(IDL.Nat8), // zoom
+				IDL.Opt(IDL.Nat16), // width
+				IDL.Opt(IDL.Nat16), // height
+				IDL.Opt(IDL.Vec(MarkerIDL)), // markers
+			],
+			[IDL.Variant({ ok: IDL.Text, err: IDL.Text })],
+			[]
+		),
 	});
 };
 
@@ -113,6 +162,9 @@ try {
 	console.warn("Backend Actorの初期化に失敗しました:", error);
 }
 
+// HTTPS Outcalls用の結果型
+type ResultType<T> = { ok: T } | { err: string };
+
 export class ICPService {
 	static async recordVisit(ipInfo: IpInfo): Promise<boolean> {
 		if (!backendActor) {
@@ -124,6 +176,74 @@ export class ICPService {
 			return result;
 		} catch (error) {
 			console.error("訪問記録の保存に失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// HTTPS Outcallsを使用してIPアドレス情報を取得
+	static async fetchIpInfo(ip: string): Promise<IpInfo> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+
+		try {
+			const result: ResultType<IpInfo> = await backendActor.fetchIpInfo(
+				ip
+			);
+
+			if ("ok" in result) {
+				return result.ok;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("IP情報の取得に失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// IPアドレスから自動的に情報を取得して記録
+	static async recordVisitByIp(ip: string): Promise<boolean> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+
+		try {
+			const result: ResultType<boolean> =
+				await backendActor.recordVisitByIp(ip);
+
+			if ("ok" in result) {
+				return result.ok;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("IP情報による訪問記録の保存に失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// マップタイルを取得
+	static async fetchMapTile(
+		z: number,
+		x: number,
+		y: number
+	): Promise<Uint8Array> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+
+		try {
+			const result: ResultType<Uint8Array> =
+				await backendActor.fetchMapTile(z, x, y);
+
+			if ("ok" in result) {
+				return result.ok;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("マップタイル取得に失敗しました:", error);
 			throw error;
 		}
 	}
@@ -267,6 +387,59 @@ export class ICPService {
 			};
 		} catch (error) {
 			console.error("ヘルスチェックに失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// グローバルIPアドレスをICPのOUTCALLSで取得
+	static async fetchGlobalIp(): Promise<string> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+		try {
+			const result: { ok?: string; err?: string } =
+				await backendActor.fetchGlobalIp();
+			if ("ok" in result) {
+				return result.ok as string;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("グローバルIPアドレスの取得に失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// 静的マップ画像を取得
+	static async getStaticMap(
+		lat: string,
+		lon: string,
+		zoom?: number,
+		width?: number,
+		height?: number,
+		markers?: Marker[]
+	): Promise<string> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+
+		try {
+			const result: ResultType<string> = await backendActor.getStaticMap(
+				lat,
+				lon,
+				zoom ? [zoom] : [],
+				width ? [width] : [],
+				height ? [height] : [],
+				markers ? [markers] : []
+			);
+
+			if ("ok" in result) {
+				return result.ok;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("静的マップ画像の取得に失敗しました:", error);
 			throw error;
 		}
 	}

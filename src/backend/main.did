@@ -10,22 +10,28 @@ type IpInfo = record {
     timezone : text
 };
 
+type Marker = record {
+    lat : text;
+    lon : text;
+    color : text
+};
+
 type PagedVisitsResult = record {
     visits : vec IpInfo;
     totalPages : nat;
     currentPage : nat;
-    totalItems : nat;
+    totalItems : nat
 };
 
 type CountryStats = record {
     country : text;
-    visitCount : nat;
+    visitCount : nat
 };
 
 type MemoryStats = record {
     totalVisits : nat;
     bufferCapacity : nat;
-    uniqueCountries : nat;
+    uniqueCountries : nat
 };
 
 service : {
@@ -34,10 +40,22 @@ service : {
     getStats : () -> (record { totalVisits : nat; uniqueCountries : nat }) query;
     recordVisit : (IpInfo) -> (bool);
     whoami : () -> (text) query;
-    
+
     // 新しいスケーラブル機能
     getVisitsPaged : (nat, nat) -> (PagedVisitsResult) query;
     getCountryStats : () -> (vec record { text; nat }) query;
     clearAllData : () -> (bool);
     getMemoryStats : () -> (MemoryStats) query;
+
+    // HTTPS Outcalls機能
+    fetchIpInfo : (text) -> (variant { ok : IpInfo; err : text });
+    recordVisitByIp : (text) -> (variant { ok : bool; err : text });
+
+    // マップタイル取得機能
+    fetchMapTile : (nat, nat, nat) -> (variant { ok : blob; err : text });
+
+    // 静的マップ画像取得機能
+    getStaticMap : (text, text, opt nat8, opt nat16, opt nat16, opt vec Marker) -> (variant { ok : text; err : text });
+
+    fetchGlobalIp : () -> (variant { ok : text; err : text })
 }
