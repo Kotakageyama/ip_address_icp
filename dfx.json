@@ -18,7 +18,7 @@
 			"type": "ephemeral"
 		},
 		"ic": {
-			"providers": ["https://ic0.app"],
+			"providers": ["https://ic0.io"],
 			"type": "persistent"
 		}
 	}

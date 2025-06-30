@@ -23,8 +23,8 @@ export const ICP_CONFIG = {
 	// ローカル開発環境のホスト
 	LOCAL_HOST: "http://localhost:4943",
 
-	// 本番環境のホスト
-	PRODUCTION_HOST: "https://ic0.app",
+	// 本番環境のホスト - icp0.ioを使用してCSPエラーを回避
+	PRODUCTION_HOST: "https://icp0.io",
 
 	// デフォルトのCanister ID
 	DEFAULT_CANISTER_ID: "rdmx6-jaaaa-aaaaa-aaadq-cai",
