@@ -1,5 +1,12 @@
-import { Actor, HttpAgent } from "@dfinity/agent";
+import { HttpAgent } from "@dfinity/agent";
 import { IpInfo, Stats, Marker } from "../types";
+// 生成された型定義をインポート
+import { createActor } from "../../declarations/ip_address_backend";
+import type {
+	_SERVICE,
+	IpInfo as GeneratedIpInfo,
+	Marker as GeneratedMarker,
+} from "../../declarations/ip_address_backend/ip_address_backend.did";
 
 // 環境に応じたホスト設定
 const getHost = () => {
@@ -53,65 +60,6 @@ if (
 	agent.fetchRootKey();
 }
 
-// Canister IDL インターフェース定義（スケーラブル版）
-const idlFactory = ({ IDL }: any) => {
-	const IpInfoIDL = IDL.Record({
-		ip: IDL.Text,
-		country: IDL.Text,
-		region: IDL.Text,
-		city: IDL.Text,
-		latitude: IDL.Text,
-		longitude: IDL.Text,
-		timezone: IDL.Text,
-		isp: IDL.Text,
-		timestamp: IDL.Int,
-	});
-
-	const MarkerIDL = IDL.Record({
-		lat: IDL.Text,
-		lon: IDL.Text,
-		color: IDL.Text,
-	});
-
-	const ResultIpInfoIDL = IDL.Variant({
-		ok: IpInfoIDL,
-		err: IDL.Text,
-	});
-
-	return IDL.Service({
-		getLatestVisits: IDL.Func([IDL.Nat], [IDL.Vec(IpInfoIDL)], ["query"]),
-		getStats: IDL.Func(
-			[],
-			[
-				IDL.Record({
-					totalVisits: IDL.Nat,
-					uniqueCountries: IDL.Nat,
-				}),
-			],
-			["query"]
-		),
-		whoami: IDL.Func([], [IDL.Text], ["query"]),
-
-		// HTTPS Outcalls関連のメソッド
-		// クライアントから送信されたIPで記録
-		recordVisitFromClient: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
-
-		// 静的マップ画像取得機能
-		getStaticMap: IDL.Func(
-			[
-				IDL.Text, // lat
-				IDL.Text, // lon
-				IDL.Opt(IDL.Nat8), // zoom
-				IDL.Opt(IDL.Nat16), // width
-				IDL.Opt(IDL.Nat16), // height
-				IDL.Opt(IDL.Vec(MarkerIDL)), // markers
-			],
-			[IDL.Variant({ ok: IDL.Text, err: IDL.Text })],
-			[]
-		),
-	});
-};
-
 // Canister ID（デプロイ後に更新が必要）
 const canisterId =
 	import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND ||
@@ -119,20 +67,37 @@ const canisterId =
 
 console.log("Using canister ID:", canisterId);
 
-// Actorインスタンスの作成
-let backendActor: any = null;
+// 生成された型定義を使用してActorインスタンスを作成
+let backendActor: _SERVICE | null = null;
 
 try {
-	backendActor = Actor.createActor(idlFactory, {
+	backendActor = createActor(canisterId, {
 		agent,
-		canisterId,
 	});
 } catch (error) {
 	console.warn("Backend Actorの初期化に失敗しました:", error);
 }
 
-// HTTPS Outcalls用の結果型
-type ResultType<T> = { ok: T } | { err: string };
+// 型変換ユーティリティ関数
+const convertGeneratedIpInfoToIpInfo = (
+	generated: GeneratedIpInfo
+): IpInfo => ({
+	ip: generated.ip,
+	country: generated.country,
+	region: generated.region,
+	city: generated.city,
+	latitude: generated.latitude,
+	longitude: generated.longitude,
+	timezone: generated.timezone,
+	isp: generated.isp,
+	timestamp: generated.timestamp,
+});
+
+const convertMarkerToGeneratedMarker = (marker: Marker): GeneratedMarker => ({
+	lat: marker.lat,
+	lon: marker.lon,
+	color: marker.color,
+});
 
 export class ICPService {
 	// クライアントから送信されたIPアドレスで訪問を記録
@@ -142,11 +107,10 @@ export class ICPService {
 		}
 
 		try {
-			const result: ResultType<IpInfo> =
-				await backendActor.recordVisitFromClient(clientIp);
+			const result = await backendActor.recordVisitFromClient(clientIp);
 
 			if ("ok" in result) {
-				return result.ok;
+				return convertGeneratedIpInfoToIpInfo(result.ok);
 			} else {
 				throw new Error(result.err);
 			}
@@ -159,16 +123,14 @@ export class ICPService {
 		}
 	}
 
-	// マップタイルを取得
-
 	static async getLatestVisits(count: number): Promise<IpInfo[]> {
 		if (!backendActor) {
 			throw new Error("Backend Actorが初期化されていません");
 		}
 
 		try {
-			const visits = await backendActor.getLatestVisits(count);
-			return visits;
+			const visits = await backendActor.getLatestVisits(BigInt(count));
+			return visits.map(convertGeneratedIpInfoToIpInfo);
 		} catch (error) {
 			console.error("最近の訪問記録の取得に失敗しました:", error);
 			throw error;
@@ -182,7 +144,10 @@ export class ICPService {
 
 		try {
 			const stats = await backendActor.getStats();
-			return stats;
+			return {
+				totalVisits: stats.totalVisits,
+				uniqueCountries: stats.uniqueCountries,
+			};
 		} catch (error) {
 			console.error("統計情報の取得に失敗しました:", error);
 			throw error;
@@ -229,13 +194,17 @@ export class ICPService {
 		}
 
 		try {
-			const result: ResultType<string> = await backendActor.getStaticMap(
+			const convertedMarkers = markers?.map(
+				convertMarkerToGeneratedMarker
+			);
+
+			const result = await backendActor.getStaticMap(
 				lat,
 				lon,
 				zoom ? [zoom] : [],
 				width ? [width] : [],
 				height ? [height] : [],
-				markers ? [markers] : []
+				convertedMarkers ? [convertedMarkers] : []
 			);
 
 			if ("ok" in result) {
