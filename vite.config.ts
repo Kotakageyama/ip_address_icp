@@ -16,12 +16,12 @@ export default defineConfig(({ mode }) => ({
 	},
 	define: {
 		global: "globalThis",
-		// 本番環境では明示的にDEVをfalseに設定
+		// 本番環境では明示的に環境変数を設定
 		...(mode === "production" && {
 			"import.meta.env.DEV": false,
 			"import.meta.env.PROD": true,
-			"import.meta.env.VITE_IS_LOCAL_NETWORK": false,
-			"import.meta.env.VITE_LOCAL_BACKEND_HOST": "",
+			"import.meta.env.VITE_IS_LOCAL_NETWORK": JSON.stringify("false"),
+			"import.meta.env.VITE_LOCAL_BACKEND_HOST": JSON.stringify(""),
 		}),
 	},
 	resolve: {
