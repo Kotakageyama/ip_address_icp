@@ -33,7 +33,7 @@ const agent = new HttpAgent({
 });
 
 // ローカル開発環境では証明書を検証しない
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_BACKEND_HOST) {
 	agent.fetchRootKey();
 }
 

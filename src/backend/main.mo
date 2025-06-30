@@ -7,8 +7,10 @@ import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
 import Blob "mo:base/Blob";
 import Result "mo:base/Result";
+import Bool "mo:base/Bool";
 
-actor IpAddressBackend {
+actor class IpAddressBackend(localMode : Bool) = this {
+  Debug.print("IpAddressBackend: LocalMode=" # Bool.toText(localMode));
   // HTTPS Outcalls用の型定義
   public type HttpRequestArgs = {
     url : Text;
@@ -80,6 +82,21 @@ actor IpAddressBackend {
 
   // HTTPS Outcallsを使用してIPアドレス情報を取得
   public func fetchIpInfo(ip : Text) : async Result.Result<IpInfo, Text> {
+    if (localMode) {
+      let now = Time.now();
+      let mock : IpInfo = {
+        ip = ip;
+        country = "Japan";
+        region = "Tokyo";
+        city = "Chiyoda";
+        latitude = "35.6895";
+        longitude = "139.6917";
+        timezone = "Asia/Tokyo";
+        isp = "Mock ISP";
+        timestamp = now;
+      };
+      return #ok(mock);
+    };
     try {
       // IPv6をサポートするipapi.coを使用
       let request : HttpRequestArgs = {
@@ -96,27 +113,19 @@ actor IpAddressBackend {
           context = Blob.fromArray([]);
         };
       };
-
       // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
       let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
-
-      // レスポンスのステータスコードをチェック
       if (http_response.status != 200) {
         return #err("HTTP Error: " # Nat.toText(http_response.status));
       };
-
-      // レスポンスボディをテキストに変換
       let decoded_text : Text = switch (Text.decodeUtf8(http_response.body)) {
         case (null) { return #err("Failed to decode response") };
         case (?text) { text };
       };
-
-      // JSONからIP情報を抽出
       switch (parseIpInfo(decoded_text)) {
         case (#ok(ipInfo)) { #ok(ipInfo) };
         case (#err(msg)) { #err(msg) };
       };
-
     } catch (_) {
       #err("Request failed");
     };
@@ -196,6 +205,10 @@ actor IpAddressBackend {
 
   // IPアドレス情報を記録（効率的なBuffer追加）
   public func recordVisit(ipInfo : IpInfo) : async Bool {
+    if (localMode) {
+      Debug.print("ローカルモード: 訪問記録はスキップされました");
+      return true;
+    };
     let newInfo = {
       ip = ipInfo.ip;
       country = ipInfo.country;
@@ -219,6 +232,22 @@ actor IpAddressBackend {
 
   // IPアドレスから自動的に情報を取得して記録
   public func recordVisitByIp(ip : Text) : async Result.Result<Bool, Text> {
+    if (localMode) {
+      let now = Time.now();
+      let mock : IpInfo = {
+        ip = ip;
+        country = "Japan";
+        region = "Tokyo";
+        city = "Chiyoda";
+        latitude = "35.6895";
+        longitude = "139.6917";
+        timezone = "Asia/Tokyo";
+        isp = "Mock ISP";
+        timestamp = now;
+      };
+      let result = await recordVisit(mock);
+      return #ok(result);
+    };
     switch (await fetchIpInfo(ip)) {
       case (#ok(ipInfo)) {
         let result = await recordVisit(ipInfo);
@@ -232,6 +261,10 @@ actor IpAddressBackend {
 
   // マップタイルを取得（OpenStreetMap）
   public func fetchMapTile(z : Nat, x : Nat, y : Nat) : async Result.Result<Blob, Text> {
+    if (localMode) {
+      // ローカルモード時は空のBlobを返す
+      return #ok(Blob.fromArray([]));
+    };
     try {
       // OpenStreetMapのタイルサーバーを使用
       let url = "https://tile.openstreetmap.org/" # Nat.toText(z) # "/" # Nat.toText(x) # "/" # Nat.toText(y) # ".png";
@@ -273,6 +306,13 @@ actor IpAddressBackend {
       context : Blob;
     }
   ) : async HttpRequestResult {
+    if (localMode) {
+      return {
+        status = 200;
+        body = Blob.fromArray([]);
+        headers = [];
+      };
+    };
     {
       status = args.response.status;
       body = args.response.body;
@@ -285,6 +325,10 @@ actor IpAddressBackend {
 
   // 最新の訪問記録を取得（ページング対応）
   public query func getLatestVisits(count : Nat) : async [IpInfo] {
+    if (localMode) {
+      Debug.print("ローカルモード: マップタイルはスキップされました");
+      return [];
+    };
     let total = visitBuffer.size();
     if (total == 0) {
       return [];
@@ -325,6 +369,14 @@ actor IpAddressBackend {
     currentPage : Nat;
     totalItems : Nat;
   } {
+    if (localMode) {
+      return {
+        visits = [];
+        totalPages = 0;
+        currentPage = page;
+        totalItems = 0;
+      };
+    };
     let total = visitBuffer.size();
     // 安全な総ページ数計算（オーバーフロー対策）
     let totalPages = if (total == 0 or pageSize == 0) {
@@ -387,6 +439,9 @@ actor IpAddressBackend {
 
   // 全ての訪問記録を取得（大量データ対応）
   public query func getAllVisits() : async [IpInfo] {
+    if (localMode) {
+      return [];
+    };
     Buffer.toArray(visitBuffer);
   };
 
@@ -395,6 +450,12 @@ actor IpAddressBackend {
     totalVisits : Nat;
     uniqueCountries : Nat;
   } {
+    if (localMode) {
+      return {
+        totalVisits = 0;
+        uniqueCountries = 0;
+      };
+    };
     // キャッシュが無効化されている場合のみ再計算
     if (cacheInvalidated) {
       updateCountriesCache();
@@ -408,6 +469,9 @@ actor IpAddressBackend {
 
   // 国別統計の詳細情報
   public query func getCountryStats() : async [(Text, Nat)] {
+    if (localMode) {
+      return [];
+    };
     if (cacheInvalidated) {
       updateCountriesCache();
     };
@@ -448,6 +512,10 @@ actor IpAddressBackend {
 
   // データクリア機能（管理用）
   public func clearAllData() : async Bool {
+    if (localMode) {
+      Debug.print("ローカルモード: データクリアはスキップされました");
+      return true;
+    };
     visitBuffer.clear();
     totalVisitsCount := 0;
     uniqueCountriesCache := [];
@@ -476,6 +544,10 @@ actor IpAddressBackend {
 
   // クライアントのグローバルIPアドレスを取得（ipifyを利用）
   public func fetchGlobalIp() : async Result.Result<Text, Text> {
+    if (localMode) {
+      Debug.print("ローカルモード: fetchGlobalIpはスキップされました");
+      return #ok("127.0.0.1");
+    };
     try {
       let request : HttpRequestArgs = {
         url = "https://api64.ipify.org?format=json";
@@ -491,27 +563,21 @@ actor IpAddressBackend {
           context = Blob.fromArray([]);
         };
       };
-
       let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
-
       if (http_response.status != 200) {
         return #err("HTTP Error: " # Nat.toText(http_response.status));
       };
-
       let decoded_text : Text = switch (Text.decodeUtf8(http_response.body)) {
         case (null) { return #err("Failed to decode response") };
         case (?text) { text };
       };
-
-      // 例: {"ip":"xxx.xxx.xxx.xxx"}
       let ip = extractJsonValue(decoded_text, "ip");
       if (ip == "") {
         return #err("Invalid JSON response");
       };
       #ok(ip);
-
     } catch (_) {
       #err("Request failed");
     };
-  }
+  };
 };
