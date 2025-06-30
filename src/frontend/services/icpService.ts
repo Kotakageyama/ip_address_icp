@@ -93,7 +93,7 @@ const idlFactory = ({ IDL }: any) => {
 // Canister ID（デプロイ後に更新が必要）
 const canisterId =
 	import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND ||
-	"uxrrr-q7777-77774-qaaaq-cai";
+	"xysua-saaaa-aaaaj-qnq5q-cai";
 
 // Actorインスタンスの作成
 let backendActor: any = null;
