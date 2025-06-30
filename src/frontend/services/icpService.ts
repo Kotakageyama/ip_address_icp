@@ -3,31 +3,53 @@ import { IpInfo, Stats, Marker } from "../types";
 
 // 環境に応じたホスト設定
 const getHost = () => {
-	// ローカル開発環境変数が設定されている場合
+	// デバッグ情報をログ出力
+	console.log("Environment check:", {
+		DEV: import.meta.env.DEV,
+		MODE: import.meta.env.MODE,
+		VITE_LOCAL_BACKEND_HOST: import.meta.env.VITE_LOCAL_BACKEND_HOST,
+		VITE_IS_LOCAL_NETWORK: import.meta.env.VITE_IS_LOCAL_NETWORK,
+	});
+
+	// 明示的にローカル開発環境変数が設定されている場合
 	if (import.meta.env.VITE_LOCAL_BACKEND_HOST) {
+		console.log(
+			"Using VITE_LOCAL_BACKEND_HOST:",
+			import.meta.env.VITE_LOCAL_BACKEND_HOST
+		);
 		return import.meta.env.VITE_LOCAL_BACKEND_HOST;
 	}
 
-	// 開発モード（npm run dev）の場合
-	if (import.meta.env.DEV) {
-		return "http://localhost:4943";
-	}
-
-	// プロダクションでもローカルネットワーク用の環境変数がある場合
+	// 明示的にローカルネットワーク用の環境変数がある場合
 	if (import.meta.env.VITE_IS_LOCAL_NETWORK === "true") {
+		console.log("Using local network: http://localhost:4943");
 		return "http://localhost:4943";
 	}
 
-	// 本番環境
+	// 開発モード（npm run dev）の場合のみローカルホストを使用
+	if (import.meta.env.DEV && import.meta.env.MODE === "development") {
+		console.log("Using development mode: http://localhost:4943");
+		return "http://localhost:4943";
+	}
+
+	// デフォルト: 本番環境（IC mainnet）
+	console.log("Using production mode: https://ic0.app");
 	return "https://ic0.app";
 };
 
+const host = getHost();
+console.log("Initializing agent with host:", host);
+
 const agent = new HttpAgent({
-	host: getHost(),
+	host,
 });
 
 // ローカル開発環境では証明書を検証しない
-if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_BACKEND_HOST) {
+if (
+	(import.meta.env.DEV && import.meta.env.MODE === "development") ||
+	import.meta.env.VITE_LOCAL_BACKEND_HOST ||
+	import.meta.env.VITE_IS_LOCAL_NETWORK === "true"
+) {
 	agent.fetchRootKey();
 }
 
@@ -93,7 +115,9 @@ const idlFactory = ({ IDL }: any) => {
 // Canister ID（デプロイ後に更新が必要）
 const canisterId =
 	import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND ||
-	"xysua-saaaa-aaaaj-qnq5q-cai";
+	"x7tsu-7yaaa-aaaaj-qnq5a-cai";
+
+console.log("Using canister ID:", canisterId);
 
 // Actorインスタンスの作成
 let backendActor: any = null;
