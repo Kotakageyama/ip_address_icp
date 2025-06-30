@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { IpInfo } from "../types";
-import { IPService } from "../services/ipService";
 import { ICPService } from "../services/icpService";
 
 export const useIpLocation = () => {
@@ -16,8 +15,8 @@ export const useIpLocation = () => {
 			// ICPが利用可能な場合はOUTCALLS機能を使用
 			if (ICPService.isAvailable()) {
 				try {
-					// 現在のクライアントIPを取得するために、まず軽量なIP取得APIを使用
-					const clientIp = await getClientIp();
+					// BE経由でグローバルIPを取得
+					const clientIp = await ICPService.fetchGlobalIp();
 
 					// ICPのOUTCALLS機能でIP情報を取得して記録
 					const success = await ICPService.recordVisitByIp(clientIp);
@@ -36,47 +35,16 @@ export const useIpLocation = () => {
 					}
 				} catch (error) {
 					console.warn("OUTCALLS機能での取得に失敗:", error);
+					setError("IP情報の取得に失敗しました");
 				}
-			}
-
-			// フォールバック：従来のクライアント側取得
-			console.log("フォールバックとして従来の方法でIP情報を取得します");
-			const ipInfo = await IPService.fetchIpInfo();
-			if (ipInfo) {
-				setCurrentIpInfo(ipInfo);
-
-				// ICPに記録（可能な場合）
-				if (ICPService.isAvailable()) {
-					try {
-						await ICPService.recordVisit(ipInfo);
-						console.log("訪問情報をCanisterに記録しました");
-					} catch (error) {
-						console.warn("Canisterへの記録に失敗しました:", error);
-					}
-				}
+			} else {
+				setError("ICPServiceが利用できません");
 			}
 		} catch (error) {
 			console.error("IP位置情報の取得に失敗しました:", error);
 			setError("IP位置情報の取得に失敗しました");
 		} finally {
 			setLoading(false);
-		}
-	};
-
-	// クライアントIPを軽量に取得するヘルパー関数
-	const getClientIp = async (): Promise<string> => {
-		try {
-			// ICPのOUTCALLSでグローバルIPを取得
-			if (ICPService.isAvailable()) {
-				return await ICPService.fetchGlobalIp();
-			}
-			// フォールバック: 直接fetch（ローカル開発用）
-			const response = await fetch("https://api64.ipify.org?format=json");
-			const data = await response.json();
-			return data.ip || "127.0.0.1";
-		} catch (error) {
-			console.warn("クライアントIP取得に失敗:", error);
-			return "127.0.0.1"; // フォールバック
 		}
 	};
 
