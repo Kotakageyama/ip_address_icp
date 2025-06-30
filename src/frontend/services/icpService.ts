@@ -77,14 +77,6 @@ const idlFactory = ({ IDL }: any) => {
 
 		// HTTPS Outcalls関連のメソッド
 		recordVisitByIp: IDL.Func([IDL.Text], [ResultBoolIDL], []),
-		fetchGlobalIp: IDL.Func(
-			[],
-			[IDL.Variant({ ok: IDL.Text, err: IDL.Text })],
-			[]
-		),
-
-		// Full on-chain: 完全自動記録
-		recordCurrentVisit: IDL.Func([], [ResultIpInfoIDL], []),
 
 		// クライアントから送信されたIPで記録
 		recordVisitFromClient: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
@@ -228,26 +220,6 @@ export class ICPService {
 		return value.toString();
 	}
 
-	// グローバルIPアドレスをICPのOUTCALLSで取得
-	static async fetchGlobalIp(): Promise<string> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-		try {
-			const result: { ok?: string; err?: string } =
-				await backendActor.fetchGlobalIp();
-			if ("ok" in result) {
-				return result.ok as string;
-			} else {
-				throw new Error(result.err);
-			}
-		} catch (error) {
-			console.error("グローバルIPアドレスの取得に失敗しました:", error);
-			throw error;
-		}
-	}
-
-	// 静的マップ画像を取得
 	static async getStaticMap(
 		lat: string,
 		lon: string,

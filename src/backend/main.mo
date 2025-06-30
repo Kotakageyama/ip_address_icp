@@ -532,47 +532,6 @@ actor class IpAddressBackend(localMode : Bool) = this {
     "IP Address Tracker Canister on Internet Computer (Scalable Version v2.0)";
   };
 
-  // クライアントのグローバルIPアドレスを取得（ipifyを利用）
-  public func fetchGlobalIp() : async Result.Result<Text, Text> {
-    try {
-      // localModeの場合はテストIPアドレスを返す
-      if (localMode) {
-        Debug.print("テストモード: テストIPアドレスを返しました");
-        return #ok("192.168.1.100");
-      };
-
-      let request : HttpRequestArgs = {
-        url = "https://api64.ipify.org?format=json";
-        max_response_bytes = ?200;
-        headers = [
-          { name = "User-Agent"; value = "ICP-Canister/1.0" },
-          { name = "Accept"; value = "application/json" },
-        ];
-        body = null;
-        method = #get;
-        transform = ?{
-          function = transform;
-          context = Blob.fromArray([]);
-        };
-      };
-      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
-      if (http_response.status != 200) {
-        return #err("HTTP Error: " # Nat.toText(http_response.status));
-      };
-      let decoded_text : Text = switch (Text.decodeUtf8(http_response.body)) {
-        case (null) { return #err("Failed to decode response") };
-        case (?text) { text };
-      };
-      let ip = extractJsonValue(decoded_text, "ip");
-      if (ip == "") {
-        return #err("Invalid JSON response");
-      };
-      #ok(ip);
-    } catch (_) {
-      #err("Request failed");
-    };
-  };
-
   // HTTPリクエストからクライアントIPアドレスを取得
   public func getClientIpFromRequest() : async Result.Result<Text, Text> {
     // ICPでは、IC0インターフェイスを通じてリクエスト情報にアクセスできます
