@@ -46,16 +46,6 @@ const Stats: React.FC<StatsProps> = ({ stats }) => {
 					<div className="stats-label">影響を受けた国</div>
 					<div className="stats-subtitle">漏洩が確認された国の数</div>
 				</div>
-				<div className="stats-card risk-card">
-					<div className="stats-icon">🛡️</div>
-					<div className="stats-value">
-						{stats.totalVisits > 0 ? "高" : "低"}
-					</div>
-					<div className="stats-label">リスクレベル</div>
-					<div className="stats-subtitle">
-						現在のWebRTC漏洩リスク評価
-					</div>
-				</div>
 			</div>
 			<div className="stats-footer">
 				<div className="security-tip">

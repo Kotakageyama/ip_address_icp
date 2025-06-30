@@ -15,6 +15,7 @@ const App: React.FC = () => {
 		currentIpInfo,
 		loading: ipLoading,
 		error: ipError,
+		isPrivacySecure,
 	} = useIpLocation();
 	const { stats } = useStats();
 
@@ -51,8 +52,21 @@ const App: React.FC = () => {
 			<Header />
 
 			<main className="main-content">
-				<CurrentVisitor ipInfo={currentIpInfo} />
-				<StaticMap ipInfo={currentIpInfo} width={800} height={500} />
+				<CurrentVisitor
+					ipInfo={currentIpInfo}
+					isPrivacySecure={isPrivacySecure}
+				/>
+
+				{/* IP漏洩が検出された場合のみマップと統計を表示 */}
+				{isPrivacySecure === false && (
+					<>
+						<StaticMap
+							ipInfo={currentIpInfo}
+							width={800}
+							height={500}
+						/>
+					</>
+				)}
 				<Stats stats={stats} />
 				<RecentVisits />
 			</main>

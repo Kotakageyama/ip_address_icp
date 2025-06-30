@@ -6,6 +6,9 @@ export const useIpLocation = () => {
 	const [currentIpInfo, setCurrentIpInfo] = useState<IpInfo | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [isPrivacySecure, setIsPrivacySecure] = useState<boolean | null>(
+		null
+	); // IP漏洩チェック結果
 
 	// WebRTC STUN サーバーを使用してクライアントIPを取得
 	const fetchClientIpViaWebRTC = async (): Promise<string> => {
@@ -149,77 +152,45 @@ export const useIpLocation = () => {
 		);
 	};
 
-	// フォールバック: ユーザーに手動入力を求める
-	const askUserForIP = async (): Promise<string> => {
-		return new Promise((resolve, reject) => {
-			// シンプルなプロンプトを使用（実際のアプリでは適切なUIを実装）
-			const userIP = prompt(
-				"IPアドレスの自動取得に失敗しました。\n" +
-					"あなたのパブリックIPアドレスを入力してください：\n" +
-					"（https://whatismyipaddress.com/ などで確認できます）"
-			);
-
-			if (userIP && userIP.trim()) {
-				const ip = userIP.trim();
-				// 基本的なIPアドレス形式の検証
-				const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-				if (ipRegex.test(ip)) {
-					resolve(ip);
-				} else {
-					reject(new Error("無効なIPアドレス形式です"));
-				}
-			} else {
-				reject(new Error("IPアドレスが入力されませんでした"));
-			}
-		});
-	};
-
 	const fetchIpLocation = async () => {
 		try {
 			setLoading(true);
 			setError(null);
+			setIsPrivacySecure(null);
 
 			if (ICPService.isAvailable()) {
 				try {
-					console.log("WebRTC経由でクライアントIP取得中...");
+					console.log("WebRTC経由でIP漏洩チェック開始...");
 
-					let clientIp: string;
+					let clientIp: string | null = null;
 
 					try {
 						// 1. WebRTCでIP取得を試行
 						clientIp = await fetchClientIpViaWebRTC();
 						console.log(
-							"WebRTCで取得したクライアントIP:",
+							"⚠️ WebRTCでパブリックIPが漏洩しています:",
 							clientIp
 						);
+						setIsPrivacySecure(false); // IP漏洩が検出された
 					} catch (webrtcError) {
-						console.warn("WebRTC IP取得に失敗:", webrtcError);
-
-						// 2. フォールバック: ユーザー手動入力
-						try {
-							clientIp = await askUserForIP();
-							console.log("ユーザー入力IP:", clientIp);
-						} catch (userError) {
-							throw new Error(
-								`IP取得に失敗しました: ${
-									userError instanceof Error
-										? userError.message
-										: "Unknown error"
-								}`
-							);
-						}
+						console.log("✅ WebRTC IP漏洩は検出されませんでした");
+						setIsPrivacySecure(true); // IP漏洩なし、プライバシーは安全
+						// IP漏洩がない場合は記録せずに終了
+						return;
 					}
 
-					// 3. 取得したIPをcanisterに送信して記録
-					const ipInfo = await ICPService.recordVisitFromClient(
-						clientIp
-					);
-					setCurrentIpInfo(ipInfo);
-					console.log("IP情報を正常に記録しました:", ipInfo);
+					// IP漏洩が検出された場合のみ記録
+					if (clientIp) {
+						const ipInfo = await ICPService.recordVisitFromClient(
+							clientIp
+						);
+						setCurrentIpInfo(ipInfo);
+						console.log("IP漏洩情報を記録しました:", ipInfo);
+					}
 				} catch (error) {
-					console.warn("IP取得・記録に失敗:", error);
+					console.warn("IP漏洩チェックでエラーが発生:", error);
 					setError(
-						`IP情報の取得に失敗しました: ${
+						`IP漏洩チェックでエラーが発生しました: ${
 							error instanceof Error
 								? error.message
 								: "Unknown error"
@@ -230,8 +201,8 @@ export const useIpLocation = () => {
 				setError("ICPServiceが利用できません");
 			}
 		} catch (error) {
-			console.error("IP位置情報の取得に失敗しました:", error);
-			setError("IP位置情報の取得に失敗しました");
+			console.error("IP漏洩チェックに失敗しました:", error);
+			setError("IP漏洩チェックに失敗しました");
 		} finally {
 			setLoading(false);
 		}
@@ -245,6 +216,7 @@ export const useIpLocation = () => {
 		currentIpInfo,
 		loading,
 		error,
+		isPrivacySecure, // IP漏洩チェック結果を追加
 		refetch: fetchIpLocation,
 	};
 };

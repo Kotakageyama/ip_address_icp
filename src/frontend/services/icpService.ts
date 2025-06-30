@@ -51,11 +51,6 @@ const idlFactory = ({ IDL }: any) => {
 		color: IDL.Text,
 	});
 
-	const ResultBoolIDL = IDL.Variant({
-		ok: IDL.Bool,
-		err: IDL.Text,
-	});
-
 	const ResultIpInfoIDL = IDL.Variant({
 		ok: IpInfoIDL,
 		err: IDL.Text,
@@ -76,8 +71,6 @@ const idlFactory = ({ IDL }: any) => {
 		whoami: IDL.Func([], [IDL.Text], ["query"]),
 
 		// HTTPS Outcalls関連のメソッド
-		recordVisitByIp: IDL.Func([IDL.Text], [ResultBoolIDL], []),
-
 		// クライアントから送信されたIPで記録
 		recordVisitFromClient: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
 
@@ -118,27 +111,6 @@ try {
 type ResultType<T> = { ok: T } | { err: string };
 
 export class ICPService {
-	// IPアドレスから自動的に情報を取得して記録
-	static async recordVisitByIp(ip: string): Promise<boolean> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
-		try {
-			const result: ResultType<boolean> =
-				await backendActor.recordVisitByIp(ip);
-
-			if ("ok" in result) {
-				return result.ok;
-			} else {
-				throw new Error(result.err);
-			}
-		} catch (error) {
-			console.error("IP情報による訪問記録の保存に失敗しました:", error);
-			throw error;
-		}
-	}
-
 	// クライアントから送信されたIPアドレスで訪問を記録
 	static async recordVisitFromClient(clientIp: string): Promise<IpInfo> {
 		if (!backendActor) {

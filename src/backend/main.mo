@@ -137,6 +137,97 @@ actor class IpAddressBackend(localMode : Bool) = this {
     };
   };
 
+  // マスクされたIPアドレスで情報を取得して記録
+  private func recordVisitByIpWithMask(originalIp : Text, maskedIp : Text) : async Result.Result<IpInfo, Text> {
+    try {
+      // localModeの場合はテストデータを使用
+      if (localMode) {
+        let testIpInfo : IpInfo = {
+          ip = maskedIp; // マスクされたIPを使用
+          country = "日本";
+          region = "東京都";
+          city = "渋谷区";
+          latitude = "35.6762";
+          longitude = "139.6503";
+          timezone = "Asia/Tokyo";
+          isp = "Test ISP";
+          timestamp = Time.now();
+        };
+
+        visitBuffer.add(testIpInfo);
+        totalVisitsCount += 1;
+        cacheInvalidated := true;
+
+        Debug.print("テストモード: 新しい訪問を記録（マスク版）: " # testIpInfo.country # " から " # testIpInfo.ip);
+        return #ok(testIpInfo);
+      };
+
+      // 元のIPを使用してIPアドレス情報を取得
+      let request : HttpRequestArgs = {
+        url = "https://ipapi.co/" # originalIp # "/json/";
+        max_response_bytes = ?2000; // 2KB制限
+        headers = [
+          { name = "User-Agent"; value = "ICP-Canister/1.0" },
+          { name = "Accept"; value = "application/json" },
+        ];
+        body = null;
+        method = #get;
+        transform = ?{
+          function = transform;
+          context = Blob.fromArray([]);
+        };
+      };
+
+      // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
+      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
+      if (http_response.status != 200) {
+        return #err("HTTP Error: " # Nat.toText(http_response.status));
+      };
+
+      let decoded_text : Text = switch (Text.decodeUtf8(http_response.body)) {
+        case (null) { return #err("Failed to decode response") };
+        case (?text) { text };
+      };
+
+      // JSON応答をパースしてIP情報を作成（マスクされたIPを使用）
+      let parsedIp = maskedIp; // 元のIPではなくマスクされたIPを使用
+      let country = extractJsonValue(decoded_text, "country_name");
+      let region = extractJsonValue(decoded_text, "region");
+      let city = extractJsonValue(decoded_text, "city");
+      let latitude = extractJsonValue(decoded_text, "latitude");
+      let longitude = extractJsonValue(decoded_text, "longitude");
+      let timezone = extractJsonValue(decoded_text, "timezone");
+      let org = extractJsonValue(decoded_text, "org");
+
+      if (country == "") {
+        return #err("Invalid JSON response");
+      };
+
+      let ipInfo : IpInfo = {
+        ip = parsedIp; // マスクされたIPを記録
+        country = country;
+        region = region;
+        city = city;
+        latitude = latitude;
+        longitude = longitude;
+        timezone = timezone;
+        isp = org;
+        timestamp = Time.now();
+      };
+
+      // 訪問情報を記録
+      visitBuffer.add(ipInfo);
+      totalVisitsCount += 1;
+      cacheInvalidated := true; // キャッシュを無効化
+
+      Debug.print("新しい訪問を記録（マスク版）: " # ipInfo.country # " から " # ipInfo.ip);
+      #ok(ipInfo);
+
+    } catch (_) {
+      #err("Request failed");
+    };
+  };
+
   // IPアドレスから自動的に情報を取得して記録
   public func recordVisitByIp(ip : Text) : async Result.Result<Bool, Text> {
     try {
@@ -204,7 +295,7 @@ actor class IpAddressBackend(localMode : Bool) = this {
       };
 
       let ipInfo : IpInfo = {
-        ip = parsedIp;
+        ip = maskIpAddress(parsedIp); // IPアドレスをマスクして記録
         country = country;
         region = region;
         city = city;
@@ -550,10 +641,13 @@ actor class IpAddressBackend(localMode : Bool) = this {
   // クライアントから送信されたIPアドレスで訪問を記録
   public func recordVisitFromClient(clientIp : Text) : async Result.Result<IpInfo, Text> {
     try {
+      // IPアドレスをマスクする
+      let maskedIp = maskIpAddress(clientIp);
+
       // localModeの場合はテストデータを直接返す
       if (localMode) {
         let testIpInfo : IpInfo = {
-          ip = clientIp;
+          ip = maskedIp; // マスクされたIPを使用
           country = "日本";
           region = "東京都";
           city = "渋谷区";
@@ -572,29 +666,58 @@ actor class IpAddressBackend(localMode : Bool) = this {
         return #ok(testIpInfo);
       };
 
-      // IPアドレスの基本的な検証
+      // IPアドレスの基本的な検証（元のIPで検証）
       if (clientIp == "" or not isValidIpAddress(clientIp)) {
         return #err("無効なIPアドレスです: " # clientIp);
       };
 
-      // IP情報を取得して記録
-      let recordResult = await recordVisitByIp(clientIp);
+      // 元のIPでIP情報を取得してから、マスクして記録
+      let recordResult = await recordVisitByIpWithMask(clientIp, maskedIp);
       switch (recordResult) {
-        case (#ok(_)) {
-          // 記録された最新情報を返す
-          let visits = getLatestVisits(1);
-          let latestVisits = await visits;
-          if (latestVisits.size() > 0) {
-            #ok(latestVisits[0]);
-          } else {
-            #err("記録後の取得に失敗");
-          };
+        case (#ok(ipInfo)) {
+          #ok(ipInfo);
         };
         case (#err(msg)) { #err("記録失敗: " # msg) };
       };
     } catch (_) {
       #err("処理中にエラーが発生しました");
     };
+  };
+
+  // IPアドレスのマスキング関数
+  private func maskIpAddress(ip : Text) : Text {
+    let parts = Text.split(ip, #char '.');
+    var partArray : [Text] = [];
+    var partCount = 0;
+
+    for (part in parts) {
+      partCount += 1;
+      if (partCount <= 2) {
+        partArray := Array.append(partArray, [part]);
+      } else {
+        partArray := Array.append(partArray, ["xxx"]);
+      };
+    };
+
+    // IPv6の場合
+    if (Text.contains(ip, #char ':')) {
+      let ipv6Parts = Text.split(ip, #char ':');
+      var ipv6Array : [Text] = [];
+      var ipv6Count = 0;
+
+      for (part in ipv6Parts) {
+        ipv6Count += 1;
+        if (ipv6Count <= 2) {
+          ipv6Array := Array.append(ipv6Array, [part]);
+        } else {
+          ipv6Array := Array.append(ipv6Array, ["xxxx"]);
+        };
+      };
+
+      return Text.join(":", ipv6Array.vals());
+    };
+
+    Text.join(".", partArray.vals());
   };
 
   // 簡単なIPアドレス検証
@@ -620,7 +743,7 @@ actor class IpAddressBackend(localMode : Bool) = this {
 
     let testVisits : [IpInfo] = [
       {
-        ip = "192.168.1.1";
+        ip = maskIpAddress("192.168.1.100"); // マスクされたIP
         country = "日本";
         region = "東京都";
         city = "新宿区";
@@ -631,7 +754,7 @@ actor class IpAddressBackend(localMode : Bool) = this {
         timestamp = Time.now() - 3600_000_000_000; // 1時間前
       },
       {
-        ip = "10.0.0.1";
+        ip = maskIpAddress("10.0.0.55"); // マスクされたIP
         country = "アメリカ";
         region = "カリフォルニア州";
         city = "サンフランシスコ";
@@ -642,7 +765,7 @@ actor class IpAddressBackend(localMode : Bool) = this {
         timestamp = Time.now() - 7200_000_000_000; // 2時間前
       },
       {
-        ip = "172.16.0.1";
+        ip = maskIpAddress("172.16.0.123"); // マスクされたIP
         country = "イギリス";
         region = "イングランド";
         city = "ロンドン";
