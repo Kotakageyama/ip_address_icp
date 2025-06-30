@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => ({
 		...(mode === "production" && {
 			"import.meta.env.DEV": false,
 			"import.meta.env.PROD": true,
+			"import.meta.env.VITE_IS_LOCAL_NETWORK": false,
 		}),
 	},
 	resolve: {
