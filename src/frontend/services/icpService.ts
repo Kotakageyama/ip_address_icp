@@ -40,8 +40,8 @@ const getHost = () => {
 	}
 
 	// デフォルト: 本番環境（IC mainnet）
-	console.log("Using production mode: https://ic0.io");
-	return "https://ic0.io";
+	console.log("Using production mode: https://icp0.io");
+	return "https://icp0.io";
 };
 
 const host = getHost();
