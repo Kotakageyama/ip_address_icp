@@ -1,10 +1,17 @@
 /**
  * 日付フォーマッター
  */
-export const formatDate = (timestamp: bigint): string => {
+export const formatDate = (timestamp: bigint | number): string => {
 	try {
-		// MotokoのTimestamp（ナノ秒）をJavaScriptのmillisecond単位に変換
-		const date = new Date(Number(timestamp) / 1000000);
+		let date: Date;
+
+		if (typeof timestamp === "bigint") {
+			// MotokoのTimestamp（ナノ秒）をJavaScriptのmillisecond単位に変換
+			date = new Date(Number(timestamp) / 1000000);
+		} else {
+			// JavaScriptのタイムスタンプ（ミリ秒）
+			date = new Date(timestamp);
+		}
 
 		return date.toLocaleDateString("ja-JP", {
 			year: "numeric",
@@ -14,7 +21,12 @@ export const formatDate = (timestamp: bigint): string => {
 			minute: "2-digit",
 		});
 	} catch (error) {
-		console.error("日付フォーマットエラー:", error);
+		console.error(
+			"日付フォーマットエラー:",
+			error,
+			"timestamp:",
+			timestamp
+		);
 		return "不明";
 	}
 };
@@ -25,23 +37,38 @@ export const formatDate = (timestamp: bigint): string => {
 export const formatTimeAgo = (timestamp: bigint | number): string => {
 	try {
 		const now = Date.now();
-		// bigintとnumber両方に対応
-		const date =
-			typeof timestamp === "bigint"
-				? Number(timestamp) / 1000000
-				: timestamp;
-		const diffMs = now - date;
+		let pastTime: number;
 
+		if (typeof timestamp === "bigint") {
+			// MotokoのTimestamp（ナノ秒）をJavaScriptのmillisecond単位に変換
+			pastTime = Number(timestamp) / 1000000;
+		} else {
+			// JavaScriptのタイムスタンプ（ミリ秒）
+			pastTime = timestamp;
+		}
+
+		const diffMs = now - pastTime;
+
+		// 負の値の場合は「たった今」として扱う
+		if (diffMs < 0) return "たった今";
+
+		const diffSeconds = Math.floor(diffMs / 1000);
 		const diffMinutes = Math.floor(diffMs / (1000 * 60));
 		const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
 		const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-		if (diffMinutes < 1) return "たった今";
+		if (diffSeconds < 60) return "たった今";
 		if (diffMinutes < 60) return `${diffMinutes}分前`;
 		if (diffHours < 24) return `${diffHours}時間前`;
-		return `${diffDays}日前`;
+		if (diffDays < 30) return `${diffDays}日前`;
+		return `${Math.floor(diffDays / 30)}ヶ月前`;
 	} catch (error) {
-		console.error("相対時間フォーマットエラー:", error);
+		console.error(
+			"相対時間フォーマットエラー:",
+			error,
+			"timestamp:",
+			timestamp
+		);
 		return "不明";
 	}
 };

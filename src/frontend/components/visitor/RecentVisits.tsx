@@ -70,10 +70,29 @@ const RecentVisits: React.FC = () => {
 						!visit.ip.startsWith("10.") &&
 						!visit.ip.startsWith("172.");
 
-					const timestampMs =
-						typeof visit.timestamp === "bigint"
-							? Number(visit.timestamp)
-							: visit.timestamp;
+					let timestampMs: number;
+					try {
+						if (typeof visit.timestamp === "bigint") {
+							timestampMs = Number(visit.timestamp) / 1000000;
+						} else {
+							timestampMs = visit.timestamp;
+						}
+
+						if (isNaN(timestampMs) || timestampMs <= 0) {
+							console.warn(
+								"無効なタイムスタンプ:",
+								visit.timestamp
+							);
+							timestampMs = Date.now();
+						}
+					} catch (error) {
+						console.error(
+							"タイムスタンプ処理エラー:",
+							error,
+							visit.timestamp
+						);
+						timestampMs = Date.now();
+					}
 
 					return (
 						<div
@@ -102,7 +121,12 @@ const RecentVisits: React.FC = () => {
 								</span>
 								<span className="time-detail">
 									{new Date(timestampMs).toLocaleDateString(
-										"ja-JP"
+										"ja-JP",
+										{
+											year: "numeric",
+											month: "2-digit",
+											day: "2-digit",
+										}
 									)}
 								</span>
 							</div>
