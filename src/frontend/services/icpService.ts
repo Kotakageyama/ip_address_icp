@@ -1,12 +1,5 @@
 import { Actor, HttpAgent } from "@dfinity/agent";
-import {
-	IpInfo,
-	Stats,
-	PagedVisitsResult,
-	CountryStats,
-	MemoryStats,
-	Marker,
-} from "../types";
+import { IpInfo, Stats, Marker } from "../types";
 
 // 環境に応じたホスト設定
 const getHost = () => {
@@ -58,19 +51,6 @@ const idlFactory = ({ IDL }: any) => {
 		color: IDL.Text,
 	});
 
-	const PagedVisitsResultIDL = IDL.Record({
-		visits: IDL.Vec(IpInfoIDL),
-		totalPages: IDL.Nat,
-		currentPage: IDL.Nat,
-		totalItems: IDL.Nat,
-	});
-
-	const MemoryStatsIDL = IDL.Record({
-		totalVisits: IDL.Nat,
-		bufferCapacity: IDL.Nat,
-		uniqueCountries: IDL.Nat,
-	});
-
 	const ResultBoolIDL = IDL.Variant({
 		ok: IDL.Bool,
 		err: IDL.Text,
@@ -82,9 +62,7 @@ const idlFactory = ({ IDL }: any) => {
 	});
 
 	return IDL.Service({
-		recordVisit: IDL.Func([IpInfoIDL], [IDL.Bool], []),
 		getLatestVisits: IDL.Func([IDL.Nat], [IDL.Vec(IpInfoIDL)], ["query"]),
-		getAllVisits: IDL.Func([], [IDL.Vec(IpInfoIDL)], ["query"]),
 		getStats: IDL.Func(
 			[],
 			[
@@ -97,37 +75,19 @@ const idlFactory = ({ IDL }: any) => {
 		),
 		whoami: IDL.Func([], [IDL.Text], ["query"]),
 
-		// 新しいスケーラブル機能のIDL
-		getVisitsPaged: IDL.Func(
-			[IDL.Nat, IDL.Nat],
-			[PagedVisitsResultIDL],
-			["query"]
-		),
-		getCountryStats: IDL.Func(
-			[],
-			[IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
-			["query"]
-		),
-		clearAllData: IDL.Func([], [IDL.Bool], []),
-		getMemoryStats: IDL.Func([], [MemoryStatsIDL], ["query"]),
-
-		// HTTPS Outcalls関連の新しいメソッド
-		fetchIpInfo: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
+		// HTTPS Outcalls関連のメソッド
 		recordVisitByIp: IDL.Func([IDL.Text], [ResultBoolIDL], []),
-
-		// マップタイル取得機能
-		fetchMapTile: IDL.Func(
-			[IDL.Nat, IDL.Nat, IDL.Nat],
-			[IDL.Variant({ ok: IDL.Vec(IDL.Nat8), err: IDL.Text })],
-			[]
-		),
-
-		// グローバルIPアドレスをICPのOUTCALLSで取得
 		fetchGlobalIp: IDL.Func(
 			[],
 			[IDL.Variant({ ok: IDL.Text, err: IDL.Text })],
 			[]
 		),
+
+		// Full on-chain: 完全自動記録
+		recordCurrentVisit: IDL.Func([], [ResultIpInfoIDL], []),
+
+		// クライアントから送信されたIPで記録
+		recordVisitFromClient: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
 
 		// 静的マップ画像取得機能
 		getStaticMap: IDL.Func(
@@ -166,42 +126,6 @@ try {
 type ResultType<T> = { ok: T } | { err: string };
 
 export class ICPService {
-	static async recordVisit(ipInfo: IpInfo): Promise<boolean> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
-		try {
-			const result = await backendActor.recordVisit(ipInfo);
-			return result;
-		} catch (error) {
-			console.error("訪問記録の保存に失敗しました:", error);
-			throw error;
-		}
-	}
-
-	// HTTPS Outcallsを使用してIPアドレス情報を取得
-	static async fetchIpInfo(ip: string): Promise<IpInfo> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
-		try {
-			const result: ResultType<IpInfo> = await backendActor.fetchIpInfo(
-				ip
-			);
-
-			if ("ok" in result) {
-				return result.ok;
-			} else {
-				throw new Error(result.err);
-			}
-		} catch (error) {
-			console.error("IP情報の取得に失敗しました:", error);
-			throw error;
-		}
-	}
-
 	// IPアドレスから自動的に情報を取得して記録
 	static async recordVisitByIp(ip: string): Promise<boolean> {
 		if (!backendActor) {
@@ -223,19 +147,15 @@ export class ICPService {
 		}
 	}
 
-	// マップタイルを取得
-	static async fetchMapTile(
-		z: number,
-		x: number,
-		y: number
-	): Promise<Uint8Array> {
+	// クライアントから送信されたIPアドレスで訪問を記録
+	static async recordVisitFromClient(clientIp: string): Promise<IpInfo> {
 		if (!backendActor) {
 			throw new Error("Backend Actorが初期化されていません");
 		}
 
 		try {
-			const result: ResultType<Uint8Array> =
-				await backendActor.fetchMapTile(z, x, y);
+			const result: ResultType<IpInfo> =
+				await backendActor.recordVisitFromClient(clientIp);
 
 			if ("ok" in result) {
 				return result.ok;
@@ -243,10 +163,15 @@ export class ICPService {
 				throw new Error(result.err);
 			}
 		} catch (error) {
-			console.error("マップタイル取得に失敗しました:", error);
+			console.error(
+				"クライアントIPによる訪問記録の保存に失敗しました:",
+				error
+			);
 			throw error;
 		}
 	}
+
+	// マップタイルを取得
 
 	static async getLatestVisits(count: number): Promise<IpInfo[]> {
 		if (!backendActor) {
@@ -276,72 +201,6 @@ export class ICPService {
 		}
 	}
 
-	// 新しいスケーラブル機能のメソッド
-
-	static async getVisitsPaged(
-		page: number,
-		pageSize: number
-	): Promise<PagedVisitsResult> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
-		try {
-			const result = await backendActor.getVisitsPaged(page, pageSize);
-			return result;
-		} catch (error) {
-			console.error("ページング付き訪問記録の取得に失敗しました:", error);
-			throw error;
-		}
-	}
-
-	static async getCountryStats(): Promise<CountryStats[]> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
-		try {
-			const stats = await backendActor.getCountryStats();
-			// [Text, Nat] タプル配列を CountryStats[] に変換
-			return stats.map(([country, visitCount]: [string, bigint]) => ({
-				country,
-				visitCount,
-			}));
-		} catch (error) {
-			console.error("国別統計の取得に失敗しました:", error);
-			throw error;
-		}
-	}
-
-	static async getMemoryStats(): Promise<MemoryStats> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
-		try {
-			const stats = await backendActor.getMemoryStats();
-			return stats;
-		} catch (error) {
-			console.error("メモリ統計の取得に失敗しました:", error);
-			throw error;
-		}
-	}
-
-	static async clearAllData(): Promise<boolean> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
-		try {
-			const result = await backendActor.clearAllData();
-			console.log("全データをクリアしました");
-			return result;
-		} catch (error) {
-			console.error("データクリアに失敗しました:", error);
-			throw error;
-		}
-	}
-
 	static async whoami(): Promise<string> {
 		if (!backendActor) {
 			throw new Error("Backend Actorが初期化されていません");
@@ -367,28 +226,6 @@ export class ICPService {
 	// ユーティリティメソッド
 	static formatBigInt(value: bigint): string {
 		return value.toString();
-	}
-
-	static async getHealthCheck(): Promise<{
-		canisterStatus: string;
-		memoryStats: MemoryStats;
-		latestVersion: string;
-	}> {
-		try {
-			const [memoryStats, version] = await Promise.all([
-				this.getMemoryStats(),
-				this.whoami(),
-			]);
-
-			return {
-				canisterStatus: "healthy",
-				memoryStats,
-				latestVersion: version,
-			};
-		} catch (error) {
-			console.error("ヘルスチェックに失敗しました:", error);
-			throw error;
-		}
 	}
 
 	// グローバルIPアドレスをICPのOUTCALLSで取得

@@ -1,15 +1,27 @@
-# 🌍 IP Address Location Tracker on Internet Computer
+# 🛡️ WebRTC IP 漏洩チェッカー on Internet Computer
 
-Internet Computer (ICP) 上で動作するFull on Chain IPアドレス位置情報トラッカーです。訪問者のIPアドレスとジオロケーション情報をリアルタイムで表示し、統計情報を管理します。
+Internet Computer (ICP) 上で動作する WebRTC による IP アドレス漏洩診断ツールです。WebRTC プロトコルを使用してあなたの実際の IP アドレスを検出し、VPN やプロキシを使用していても漏洩する可能性のある情報を可視化します。
 
 ## 🚀 特徴
 
-- **Full on Chain**: 完全分散アーキテクチャでICPネットワーク上で動作
-- **リアルタイム地図**: Leafletマップによる訪問者位置の可視化
-- **統計分析**: 訪問数、ユニーク国数などの統計情報
-- **レスポンシブデザイン**: モバイル・デスクトップ対応
-- **型安全**: TypeScriptによる堅牢な開発
-- **モダンUI**: Glass Morphismを活用した美しいインターフェース
+-   **WebRTC 漏洩検出**: WebRTC プロトコルを使用した実際の IP 漏洩チェック
+-   **Full on Chain**: 完全分散アーキテクチャで ICP ネットワーク上で動作
+-   **セキュリティ診断**: リアルタイムでプライバシーリスクを評価
+-   **漏洩可視化**: 地図上で漏洩した位置情報を表示
+-   **対策提案**: WebRTC 漏洩を防ぐための具体的な対策を提示
+-   **プライバシー保護**: 診断データは匿名化して表示
+-   **レスポンシブデザイン**: モバイル・デスクトップ対応
+
+## 🔍 WebRTC 漏洩とは
+
+WebRTC（Web Real-Time Communication）は、ブラウザ間でのリアルタイム通信を可能にする技術ですが、VPN やプロキシを使用していても、以下の情報が漏洩する可能性があります：
+
+-   **実際のパブリック IP アドレス**
+-   **ローカルネットワーク IP アドレス**
+-   **ISP（インターネットサービスプロバイダー）情報**
+-   **おおよその地理的位置**
+
+このツールは、これらの漏洩を実際に検出し、あなたのプライバシーリスクを評価します。
 
 ## 🏗️ アーキテクチャ
 
@@ -28,88 +40,90 @@ Internet Computer (ICP) 上で動作するFull on Chain IPアドレス位置情�
                     ┌─────────────┴─────────────┐
                     │                           │
           ┌─────────▼─────────┐    ┌─────────▼─────────┐
-          │   IP Geo APIs     │    │   Leaflet Maps    │
-          │  • ipapi.co       │    │  • OpenStreetMap  │
-          │  • ip-api.com     │    │  • Interactive UI │
-          │  • ipinfo.io      │    │                   │
+          │   WebRTC STUN     │    │   地図可視化      │
+          │  • Google STUN    │    │  • OpenStreetMap  │
+          │  • Cloudflare     │    │  • Leaflet Maps   │
+          │  • IP検出         │    │  • 漏洩位置表示   │
           └───────────────────┘    └───────────────────┘
 ```
 
 ## 📁 プロジェクト構造
 
 ```
-ip_address_icp/
+webrtc_leak_checker/
 ├── 📄 README.md                    # このファイル
 ├── 📄 package.json                 # Node.js依存関係
 ├── 📄 dfx.json                     # DFXプロジェクト設定
 ├── 📄 vite.config.ts              # Vite設定
 ├── 📄 tsconfig.json               # TypeScript設定
-├── 📄 tsconfig.node.json          # Node.js用TypeScript設定
 ├── 📄 index.html                  # Viteエントリーポイント
 │
 ├── 📁 docs/                       # ドキュメント
-│   ├── 📄 backend-architecture.md # バックエンドアーキテクチャ
-│   └── 📄 frontend-architecture.md # フロントエンドアーキテクチャ
+│   ├── 📄 security-analysis.md    # セキュリティ分析
+│   └── 📄 webrtc-leak-guide.md    # WebRTC漏洩対策ガイド
 │
 ├── 📁 src/                        # ソースコード
-│   ├── 📁 ip_address_backend/     # バックエンドCanister
+│   ├── 📁 backend/                # バックエンドCanister
 │   │   └── 📄 main.mo             # Motokoメインファイル
 │   │
-│   ├── 📁 components/             # Reactコンポーネント
-│   │   ├── 📄 Header.tsx          # ヘッダーコンポーネント
-│   │   ├── 📄 Header.css          # ヘッダースタイル
-│   │   ├── 📄 CurrentVisitor.tsx  # 現在の訪問者情報
-│   │   ├── 📄 CurrentVisitor.css  # 訪問者情報スタイル
-│   │   ├── 📄 Map.tsx             # 地図コンポーネント
-│   │   ├── 📄 Map.css             # 地図スタイル
-│   │   ├── 📄 Stats.tsx           # 統計情報コンポーネント
-│   │   ├── 📄 Stats.css           # 統計情報スタイル
-│   │   ├── 📄 RecentVisits.tsx    # 最近の訪問者リスト
-│   │   ├── 📄 RecentVisits.css    # 訪問者リストスタイル
-│   │   ├── 📄 Footer.tsx          # フッターコンポーネント
-│   │   └── 📄 Footer.css          # フッタースタイル
-│   │
-│   ├── 📁 services/               # サービス層
-│   │   ├── 📄 icpService.ts       # ICP Canister通信
-│   │   └── 📄 ipService.ts        # 外部IP API通信
-│   │
-│   ├── 📁 types/                  # TypeScript型定義
-│   │   └── 📄 index.ts            # 共通型定義
+│   ├── 📁 frontend/               # フロントエンド
+│   │   ├── 📁 components/         # Reactコンポーネント
+│   │   │   ├── 📁 layout/         # レイアウト
+│   │   │   │   ├── 📄 Header.tsx  # セキュリティヘッダー
+│   │   │   │   └── 📄 Footer.tsx  # フッター
+│   │   │   ├── 📁 visitor/        # 漏洩検出
+│   │   │   │   ├── 📄 CurrentVisitor.tsx # 漏洩診断結果
+│   │   │   │   └── 📄 RecentVisits.tsx   # 漏洩履歴
+│   │   │   ├── 📁 map/            # 地図表示
+│   │   │   │   └── 📄 StaticMap.tsx # 漏洩位置マップ
+│   │   │   └── 📁 stats/          # 統計
+│   │   │       └── 📄 Stats.tsx   # 漏洩統計
+│   │   │
+│   │   ├── 📁 hooks/              # カスタムフック
+│   │   │   ├── 📄 useIpLocation.ts # WebRTC IP検出
+│   │   │   ├── 📄 useRecentVisits.ts # 漏洩履歴
+│   │   │   └── 📄 useStats.ts     # 診断統計
+│   │   │
+│   │   ├── 📁 services/           # サービス層
+│   │   │   └── 📄 icpService.ts   # ICP Canister通信
+│   │   │
+│   │   ├── 📁 utils/              # ユーティリティ
+│   │   │   ├── 📄 formatters.ts   # データフォーマット
+│   │   │   └── 📄 validators.ts   # バリデーション
+│   │   │
+│   │   └── 📁 types/              # TypeScript型定義
+│   │       └── 📄 index.ts        # 共通型定義
 │   │
 │   ├── 📄 App.tsx                 # メインアプリケーション
 │   ├── 📄 App.css                 # アプリスタイル
 │   ├── 📄 main.tsx                # React エントリーポイント
-│   ├── 📄 index.css               # グローバルスタイル
-│   └── 📄 vite-env.d.ts          # Vite環境変数型定義
-│
-└── 📁 src/ip_address_frontend/    # ICP フロントエンドCanister出力
-    └── 📁 assets/                 # ビルド済みアセット (自動生成)
+│   └── 📄 index.css               # グローバルスタイル
 ```
 
 ## 🛠️ 技術スタック
 
+### セキュリティ技術
+
+-   **WebRTC**: リアルタイム通信プロトコル
+-   **STUN servers**: NAT 越えと IP 検出
+-   **ICE candidates**: ネットワーク候補収集
+
 ### バックエンド
-- **Motoko**: ICP用関数型プログラミング言語
-- **Internet Computer**: 分散コンピューティングプラットフォーム
-- **Candid**: ICPのIDLインターフェース
+
+-   **Motoko**: ICP 用関数型プログラミング言語
+-   **Internet Computer**: 分散コンピューティングプラットフォーム
+-   **HTTPS Outcalls**: 外部 API 連携
 
 ### フロントエンド
-- **React 18**: モダンUIライブラリ
-- **TypeScript**: 型安全な開発
-- **Vite**: 高速ビルドツール
-- **Leaflet**: インタラクティブマップライブラリ
-- **CSS3**: ネイティブスタイリング
 
-### 開発ツール
-- **DFX**: ICPローカル開発環境
-- **npm**: パッケージマネージャー
-- **ESLint**: コード品質管理
+-   **React 18**: モダン UI ライブラリ
+-   **TypeScript**: 型安全な開発
+-   **Vite**: 高速ビルドツール
+-   **Leaflet**: インタラクティブマップライブラリ
 
 ## 🚀 セットアップと実行
 
 ### 前提条件
-
-以下がインストールされている必要があります：
 
 ```bash
 # DFX (Internet Computer SDK)
@@ -126,7 +140,7 @@ npm --version
 
 ```bash
 git clone <このリポジトリのURL>
-cd ip_address_icp
+cd webrtc_leak_checker
 ```
 
 ### 2. 依存関係のインストール
@@ -137,28 +151,88 @@ npm install
 
 ### 3. ローカル開発環境の起動
 
-#### DFXローカルネットワークの起動
+#### DFX ローカルネットワークの起動
+
 ```bash
 dfx start --background
 ```
 
-#### Canisterのデプロイ
+#### Canister のデプロイ
+
 ```bash
 dfx deploy --network local
 ```
 
 #### フロントエンド開発サーバーの起動
+
 ```bash
 npm run dev
 ```
 
-### 4. アプリケーションにアクセス
+### 4. 漏洩チェックの実行
 
-ブラウザで `http://localhost:3000` にアクセスします。
+ブラウザで `http://localhost:3000` にアクセスし、WebRTC 漏洩診断を開始します。
+
+## 🔒 セキュリティ対策
+
+### WebRTC 漏洩を防ぐ方法
+
+#### 1. ブラウザ設定での無効化
+
+**Chrome/Edge:**
+
+```
+chrome://flags/#disable-webrtc
+```
+
+**Firefox:**
+
+```
+about:config
+media.peerconnection.enabled = false
+```
+
+#### 2. ブラウザ拡張機能
+
+-   **WebRTC Leak Prevent** (Chrome)
+-   **Disable WebRTC** (Firefox)
+-   **uBlock Origin** (全ブラウザ対応)
+
+#### 3. VPN 設定
+
+WebRTC 漏洩対応の VPN サービス:
+
+-   NordVPN (WebRTC 漏洩保護機能)
+-   ExpressVPN (DNS 漏洩保護)
+-   ProtonVPN (Advanced Leak Protection)
+
+### このツールの安全性
+
+-   **完全匿名**: 個人特定情報は収集しません
+-   **一時的**: セッション終了でデータは削除
+-   **透明性**: オープンソースで検証可能
+-   **分散型**: ICP ネットワークで分散実行
+
+## 📊 診断結果の読み方
+
+### リスクレベル
+
+| レベル | 説明                 | 対策の緊急度   |
+| ------ | -------------------- | -------------- |
+| 🛡️ 低  | ローカル IP のみ検出 | 予防的対策     |
+| ⚠️ 中  | 一部情報が漏洩       | 早期対策推奨   |
+| 🚨 高  | パブリック IP が漏洩 | 即座に対策必要 |
+
+### 検出情報の意味
+
+-   **漏洩 IP**: WebRTC で検出された IP アドレス
+-   **推定位置**: IP から算出された地理的位置
+-   **ISP 情報**: インターネットプロバイダー
+-   **リスク評価**: 総合的なプライバシーリスク
 
 ## 🌐 プロダクションデプロイ
 
-### IC本番環境へのデプロイ
+### IC 本番環境へのデプロイ
 
 ```bash
 # 本番環境にデプロイ
@@ -168,124 +242,86 @@ dfx deploy --network ic
 dfx canister --network ic id ip_address_frontend
 ```
 
-## 📖 API仕様
+## 📖 API 仕様
 
-### バックエンドCanister API
+### WebRTC 検出機能
 
-#### `recordVisit(ipInfo: IpInfo): async Bool`
-訪問者情報を記録
+#### `fetchClientIpViaWebRTC(): Promise<string>`
 
-#### `getLatestVisits(count: Nat): async [IpInfo]`
-最新の訪問記録を取得
+WebRTC プロトコルを使用してクライアント IP を検出
 
-#### `getStats(): async {totalVisits: Nat; uniqueCountries: Nat}`
-統計情報を取得
+#### `recordVisitFromClient(ip: string): Promise<IpInfo>`
 
-#### `getAllVisits(): async [IpInfo]`
-全ての訪問記録を取得
+検出された IP アドレスから漏洩情報を記録
 
-#### `whoami(): async Text`
-Canister情報を取得
+#### `getLeakageStats(): Promise<LeakageStats>`
 
-詳細は [バックエンドアーキテクチャドキュメント](docs/backend-architecture.md) を参照してください。
-
-## 🎨 UI/UX設計
-
-### デザインコンセプト
-- **Glass Morphism**: 透明感のあるモダンなデザイン
-- **グラデーション**: 美しい色彩表現
-- **レスポンシブ**: モバイルファーストアプローチ
-- **アクセシビリティ**: WAI-ARIA準拠
-
-### カラーパレット
-```css
---primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%)
---info: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)
---success: linear-gradient(135deg, #00b894 0%, #00a085 100%)
---accent: linear-gradient(135deg, #fd79a8 0%, #e84393 100%)
-```
-
-## 🔒 セキュリティ
-
-### プライバシー保護
-- IPアドレス情報は統計目的のみで使用
-- 個人特定可能な情報は収集しない
-- データは匿名化されて保存
-
-### セキュリティ機能
-- HTTPS通信の強制
-- XSS攻撃対策
-- 入力値検証
-- レート制限
+WebRTC 漏洩の統計情報を取得
 
 ## 🧪 テスト
 
-### ユニットテスト（今後実装予定）
+### セキュリティテスト
+
 ```bash
-npm run test
+# WebRTC漏洩テスト
+npm run test:webrtc
+
+# VPN漏洩テスト
+npm run test:vpn-leak
+
+# プライバシー保護テスト
+npm run test:privacy
 ```
-
-### 統合テスト（今後実装予定）
-```bash
-npm run test:integration
-```
-
-## 📊 パフォーマンス
-
-### フロントエンド最適化
-- **Code Splitting**: 必要な部分のみ読み込み
-- **Tree Shaking**: 未使用コードの除去
-- **Lazy Loading**: 画像の遅延読み込み
-- **Caching**: ブラウザキャッシュの活用
-
-### バックエンド効率性
-- **Query関数**: 読み取り専用の高速処理
-- **メモリ効率**: 最小限のデータ構造
-- **計算量最適化**: O(1)〜O(n)の効率的なアルゴリズム
 
 ## 🤝 コントリビューション
 
-1. このリポジトリをフォーク
-2. 機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
-3. 変更をコミット (`git commit -m 'Add amazing feature'`)
-4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
-5. プルリクエストを作成
+セキュリティツールとして、以下のガイドラインをお守りください：
+
+1. **セキュリティ第一**: 新機能はプライバシーを侵害しないこと
+2. **透明性**: コードは監査可能であること
+3. **匿名性**: ユーザーの匿名性を保護すること
+4. **教育目的**: セキュリティ意識向上に貢献すること
 
 ## 📄 ライセンス
 
-このプロジェクトはMITライセンスの下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
+このプロジェクトは MIT ライセンスの下で公開されています。セキュリティツールとして自由に利用・改良してください。
 
 ## 📞 サポート
 
-### ドキュメント
-- [バックエンドアーキテクチャ](docs/backend-architecture.md)
-- [フロントエンドアーキテクチャ](docs/frontend-architecture.md)
+### セキュリティに関する問い合わせ
+
+-   **一般的な質問**: GitHub Issues
+-   **セキュリティ脆弱性**: security@example.com
+-   **プライバシー問題**: privacy@example.com
 
 ### 参考リソース
-- [Internet Computer 公式ドキュメント](https://internetcomputer.org/docs/current/developer-docs/)
-- [Motoko言語ガイド](https://internetcomputer.org/docs/current/motoko/main/motoko/)
-- [React公式ドキュメント](https://react.dev/)
-- [TypeScript公式ドキュメント](https://www.typescriptlang.org/docs/)
+
+-   [WebRTC Security Guide](https://webrtcsecurity.github.io/)
+-   [Mozilla WebRTC Documentation](https://developer.mozilla.org/docs/Web/API/WebRTC_API)
+-   [Internet Computer Security Best Practices](https://internetcomputer.org/docs/current/developer-docs/security/)
 
 ## 🎯 今後のロードマップ
 
 ### v1.1.0 (近日公開予定)
-- [ ] Progressive Web App (PWA) 対応
-- [ ] ダークモード実装
-- [ ] 詳細統計機能
+
+-   [ ] IPv6 漏洩検出対応
+-   [ ] WebRTC フィンガープリンティング検出
+-   [ ] 詳細なセキュリティレポート生成
 
 ### v1.2.0 (計画中)
-- [ ] リアルタイム更新機能
-- [ ] 多言語対応
-- [ ] 高度な地図機能
+
+-   [ ] 自動セキュリティ監視機能
+-   [ ] カスタム STUN サーバー設定
+-   [ ] 企業向けセキュリティダッシュボード
 
 ### v2.0.0 (長期計画)
-- [ ] 機械学習による分析
-- [ ] API公開機能
-- [ ] 管理者ダッシュボード
+
+-   [ ] AI 駆動のセキュリティ分析
+-   [ ] ブラウザ拡張機能版
+-   [ ] モバイルアプリ版
 
 ---
 
-**Internet Computer上で動作する次世代の分散Webアプリケーション**
+**WebRTC によるプライバシー漏洩からあなたを守る、次世代のセキュリティツール**
 
-Made with ❤️ for the decentralized web
+🛡️ あなたのプライバシーを守ります 🛡️

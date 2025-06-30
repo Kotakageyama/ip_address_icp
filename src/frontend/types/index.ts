@@ -15,25 +15,6 @@ export interface Stats {
 	uniqueCountries: bigint;
 }
 
-// 新しいスケーラブル機能用の型定義
-export interface PagedVisitsResult {
-	visits: IpInfo[];
-	totalPages: bigint;
-	currentPage: bigint;
-	totalItems: bigint;
-}
-
-export interface CountryStats {
-	country: string;
-	visitCount: bigint;
-}
-
-export interface MemoryStats {
-	totalVisits: number;
-	bufferCapacity: number;
-	uniqueCountries: number;
-}
-
 export interface ApiIpInfo {
 	ip?: string;
 	country?: string;

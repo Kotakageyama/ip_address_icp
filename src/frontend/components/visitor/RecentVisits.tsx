@@ -1,16 +1,49 @@
 import React from "react";
 import { useRecentVisits } from "../../hooks/useRecentVisits";
+import { formatTimeAgo, maskIpAddress } from "../../utils/formatters";
 import "./RecentVisits.css";
 
 const RecentVisits: React.FC = () => {
-	const { recentVisits } = useRecentVisits(10);
+	const { recentVisits, loading, error } = useRecentVisits(10);
+
+	if (loading) {
+		return (
+			<section className="recent-visits">
+				<h2>🕐 最近の漏洩検出</h2>
+				<div className="visits-container">
+					<div className="loading-state">
+						<div className="scanning-animation">🔍</div>
+						<p>最近のWebRTC漏洩記録を読み込み中...</p>
+					</div>
+				</div>
+			</section>
+		);
+	}
+
+	if (error) {
+		return (
+			<section className="recent-visits">
+				<h2>🕐 最近の漏洩検出</h2>
+				<div className="visits-container">
+					<div className="error-state">
+						<span className="error-icon">❌</span>
+						<p>漏洩記録の読み込みに失敗しました</p>
+					</div>
+				</div>
+			</section>
+		);
+	}
 
 	if (recentVisits.length === 0) {
 		return (
 			<section className="recent-visits">
-				<h2>👥 最近の訪問者</h2>
-				<div className="visits-list">
-					<div className="loading">まだ訪問記録がありません</div>
+				<h2>🕐 最近の漏洩検出</h2>
+				<div className="visits-container">
+					<div className="empty-state">
+						<span className="empty-icon">🔒</span>
+						<p>まだWebRTC漏洩が検出されていません</p>
+						<small>このツールで初回の診断を実行してください</small>
+					</div>
 				</div>
 			</section>
 		);
@@ -18,30 +51,82 @@ const RecentVisits: React.FC = () => {
 
 	return (
 		<section className="recent-visits">
-			<h2>👥 最近の訪問者</h2>
-			<div className="visits-list">
-				{recentVisits.map((visit) => {
-					const visitTime = new Date(
-						Number(visit.timestamp) / 1000000
-					);
+			<h2>🕐 最近の漏洩検出</h2>
+			<div className="visits-description">
+				<p>
+					WebRTCによって検出されたIPアドレス漏洩の履歴（プライバシー保護のため一部マスク表示）
+				</p>
+			</div>
+			<div className="visits-container">
+				<div className="visits-header">
+					<span className="header-ip">🚨 漏洩IP</span>
+					<span className="header-location">📍 推定位置</span>
+					<span className="header-time">🕓 検出時刻</span>
+					<span className="header-risk">⚠️ リスク</span>
+				</div>
+				{recentVisits.map((visit, index) => {
+					const isHighRisk =
+						!visit.ip.startsWith("192.168.") &&
+						!visit.ip.startsWith("10.") &&
+						!visit.ip.startsWith("172.");
+
+					const timestampMs =
+						typeof visit.timestamp === "bigint"
+							? Number(visit.timestamp)
+							: visit.timestamp;
+
 					return (
 						<div
-							key={`${visit.ip}-${visit.timestamp}`}
-							className="visit-item"
+							key={index}
+							className={`visit-item ${
+								isHighRisk ? "high-risk" : "low-risk"
+							}`}
 						>
-							<div className="visit-header">
-								<span className="visit-ip">{visit.ip}</span>
-								<span className="visit-time">
-									{visitTime.toLocaleString("ja-JP")}
+							<div className="visit-ip">
+								<span className="ip-value">
+									{maskIpAddress(visit.ip)}
 								</span>
+								<span className="leak-indicator">📡</span>
 							</div>
 							<div className="visit-location">
-								📍 {visit.city}, {visit.region}, {visit.country}
+								<span className="location-main">
+									{visit.city}, {visit.country}
+								</span>
+								<span className="location-detail">
+									{visit.region}
+								</span>
 							</div>
-							<div className="visit-location">🌐 {visit.isp}</div>
+							<div className="visit-time">
+								<span className="time-main">
+									{formatTimeAgo(timestampMs)}
+								</span>
+								<span className="time-detail">
+									{new Date(timestampMs).toLocaleDateString(
+										"ja-JP"
+									)}
+								</span>
+							</div>
+							<div className="visit-risk">
+								<span
+									className={`risk-badge ${
+										isHighRisk ? "high" : "low"
+									}`}
+								>
+									{isHighRisk ? "🚨 高" : "🛡️ 低"}
+								</span>
+							</div>
 						</div>
 					);
 				})}
+			</div>
+			<div className="visits-footer">
+				<div className="privacy-note">
+					<span className="note-icon">🔐</span>
+					<span className="note-text">
+						プライバシー保護のため、IPアドレスは部分的にマスクして表示されています。
+						この診断データは匿名化されており、個人を特定する情報は含まれていません。
+					</span>
+				</div>
 			</div>
 		</section>
 	);

@@ -112,11 +112,12 @@ export const STORAGE_KEYS = {
  * アプリケーション情報
  */
 export const APP_INFO = {
-	NAME: "IP Address Location Tracker",
+	NAME: "WebRTC IP漏洩チェッカー",
 	VERSION: "1.0.0",
-	DESCRIPTION: "Internet Computer上で動作するIPアドレス位置情報トラッカー",
-	AUTHOR: "Your Name",
-	REPOSITORY: "https://github.com/your-username/ip_address_icp",
+	DESCRIPTION:
+		"WebRTCによるIPアドレス漏洩を診断し、プライバシー保護のためのセキュリティチェックツール",
+	AUTHOR: "Kota Kageyama",
+	REPOSITORY: "https://github.com/Kotakageyama/ip_address_icp",
 } as const;
 
 /**
