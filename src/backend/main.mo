@@ -89,42 +89,6 @@ actor class IpAddressBackend(localMode : Bool) = this {
     Debug.print("Preupgrade: " # Int.toText(stableVisits.size()) # " 件のデータを保存しました");
   };
 
-  // HTTPS Outcallsを使用してIPアドレス情報を取得
-  public func fetchIpInfo(ip : Text) : async Result.Result<IpInfo, Text> {
-    try {
-      // IPv6をサポートするipapi.coを使用
-      let request : HttpRequestArgs = {
-        url = "https://ipapi.co/" # ip # "/json/";
-        max_response_bytes = ?2000; // 2KB制限
-        headers = [
-          { name = "User-Agent"; value = "ICP-Canister/1.0" },
-          { name = "Accept"; value = "application/json" },
-        ];
-        body = null;
-        method = #get;
-        transform = ?{
-          function = transform;
-          context = Blob.fromArray([]);
-        };
-      };
-      // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
-      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
-      if (http_response.status != 200) {
-        return #err("HTTP Error: " # Nat.toText(http_response.status));
-      };
-      let decoded_text : Text = switch (Text.decodeUtf8(http_response.body)) {
-        case (null) { return #err("Failed to decode response") };
-        case (?text) { text };
-      };
-      switch (parseIpInfo(decoded_text)) {
-        case (#ok(ipInfo)) { #ok(ipInfo) };
-        case (#err(msg)) { #err(msg) };
-      };
-    } catch (_) {
-      #err("Request failed");
-    };
-  };
-
   // レスポンスの変換関数（コンセンサス用）
   public query func transform(
     args : {
@@ -137,36 +101,6 @@ actor class IpAddressBackend(localMode : Bool) = this {
       body = args.response.body;
       headers = []; // ヘッダーは除外してコンセンサスを容易にする
     };
-  };
-
-  // 簡単なJSONパーサー（IP情報用）
-  private func parseIpInfo(json : Text) : Result.Result<IpInfo, Text> {
-    let ip = extractJsonValue(json, "ip");
-    let country = extractJsonValue(json, "country_name");
-    let region = extractJsonValue(json, "region");
-    let city = extractJsonValue(json, "city");
-    let latitude = extractJsonValue(json, "latitude");
-    let longitude = extractJsonValue(json, "longitude");
-    let timezone = extractJsonValue(json, "timezone");
-    let org = extractJsonValue(json, "org");
-
-    if (ip == "" or country == "") {
-      return #err("Invalid JSON response");
-    };
-
-    let ipInfo : IpInfo = {
-      ip = ip;
-      country = country;
-      region = region;
-      city = city;
-      latitude = latitude;
-      longitude = longitude;
-      timezone = timezone;
-      isp = org;
-      timestamp = Time.now();
-    };
-
-    #ok(ipInfo);
   };
 
   // JSONから特定のフィールドの値を抽出（簡単な実装）
@@ -197,92 +131,72 @@ actor class IpAddressBackend(localMode : Bool) = this {
     };
   };
 
-  // IPアドレス情報を記録（効率的なBuffer追加）
-  public func recordVisit(ipInfo : IpInfo) : async Bool {
-    let newInfo = {
-      ip = ipInfo.ip;
-      country = ipInfo.country;
-      region = ipInfo.region;
-      city = ipInfo.city;
-      latitude = ipInfo.latitude;
-      longitude = ipInfo.longitude;
-      timezone = ipInfo.timezone;
-      isp = ipInfo.isp;
-      timestamp = Time.now();
-    };
-
-    // Buffer.add() は O(1) の操作（配列全体コピーなし）
-    visitBuffer.add(newInfo);
-    totalVisitsCount += 1;
-    cacheInvalidated := true; // キャッシュを無効化
-
-    Debug.print("新しい訪問を記録: " # newInfo.country # " から " # newInfo.ip);
-    true;
-  };
-
   // IPアドレスから自動的に情報を取得して記録
   public func recordVisitByIp(ip : Text) : async Result.Result<Bool, Text> {
-    switch (await fetchIpInfo(ip)) {
-      case (#ok(ipInfo)) {
-        let result = await recordVisit(ipInfo);
-        #ok(result);
-      };
-      case (#err(msg)) {
-        #err(msg);
-      };
-    };
-  };
-
-  // マップタイルを取得（OpenStreetMap）
-  public func fetchMapTile(z : Nat, x : Nat, y : Nat) : async Result.Result<Blob, Text> {
     try {
-      // OpenStreetMapのタイルサーバーを使用
-      let url = "https://tile.openstreetmap.org/" # Nat.toText(z) # "/" # Nat.toText(x) # "/" # Nat.toText(y) # ".png";
-
+      // IPv6をサポートするipapi.coを使用してIP情報を取得
       let request : HttpRequestArgs = {
-        url = url;
-        max_response_bytes = ?1048576; // 1MB制限（タイル画像用）
+        url = "https://ipapi.co/" # ip # "/json/";
+        max_response_bytes = ?2000; // 2KB制限
         headers = [
           { name = "User-Agent"; value = "ICP-Canister/1.0" },
-          { name = "Accept"; value = "image/png,image/*" },
+          { name = "Accept"; value = "application/json" },
         ];
         body = null;
         method = #get;
         transform = ?{
-          function = transformTile;
+          function = transform;
           context = Blob.fromArray([]);
         };
       };
 
       // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
       let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
-
-      // レスポンスのステータスコードをチェック
       if (http_response.status != 200) {
         return #err("HTTP Error: " # Nat.toText(http_response.status));
       };
 
-      #ok(http_response.body);
+      let decoded_text : Text = switch (Text.decodeUtf8(http_response.body)) {
+        case (null) { return #err("Failed to decode response") };
+        case (?text) { text };
+      };
+
+      // JSON応答をパースしてIP情報を作成
+      let parsedIp = extractJsonValue(decoded_text, "ip");
+      let country = extractJsonValue(decoded_text, "country_name");
+      let region = extractJsonValue(decoded_text, "region");
+      let city = extractJsonValue(decoded_text, "city");
+      let latitude = extractJsonValue(decoded_text, "latitude");
+      let longitude = extractJsonValue(decoded_text, "longitude");
+      let timezone = extractJsonValue(decoded_text, "timezone");
+      let org = extractJsonValue(decoded_text, "org");
+
+      if (parsedIp == "" or country == "") {
+        return #err("Invalid JSON response");
+      };
+
+      let ipInfo : IpInfo = {
+        ip = parsedIp;
+        country = country;
+        region = region;
+        city = city;
+        latitude = latitude;
+        longitude = longitude;
+        timezone = timezone;
+        isp = org;
+        timestamp = Time.now();
+      };
+
+      // 訪問情報を記録
+      visitBuffer.add(ipInfo);
+      totalVisitsCount += 1;
+      cacheInvalidated := true; // キャッシュを無効化
+
+      Debug.print("新しい訪問を記録: " # ipInfo.country # " から " # ipInfo.ip);
+      #ok(true);
 
     } catch (_) {
-      #err("Map tile request failed");
-    };
-  };
-
-  // マップタイル用のレスポンス変換関数
-  public query func transformTile(
-    args : {
-      response : HttpRequestResult;
-      context : Blob;
-    }
-  ) : async HttpRequestResult {
-    {
-      status = args.response.status;
-      body = args.response.body;
-      headers = [
-        { name = "Content-Type"; value = "image/png" },
-        { name = "Cache-Control"; value = "public, max-age=3600" },
-      ];
+      #err("Request failed");
     };
   };
 
@@ -542,78 +456,6 @@ actor class IpAddressBackend(localMode : Bool) = this {
     Buffer.toArray(resultBuffer);
   };
 
-  // ページング機能付きの訪問記録取得
-  public query func getVisitsPaged(page : Nat, pageSize : Nat) : async {
-    visits : [IpInfo];
-    totalPages : Nat;
-    currentPage : Nat;
-    totalItems : Nat;
-  } {
-    let total = visitBuffer.size();
-    // 安全な総ページ数計算（オーバーフロー対策）
-    let totalPages = if (total == 0 or pageSize == 0) {
-      0;
-    } else {
-      // 安全な除算でページ数計算
-      if (total % pageSize == 0) {
-        total / pageSize;
-      } else {
-        total / pageSize + 1;
-      };
-    };
-
-    if (page >= totalPages or pageSize == 0) {
-      return {
-        visits = [];
-        totalPages = totalPages;
-        currentPage = page;
-        totalItems = total;
-      };
-    };
-
-    // 安全な開始インデックス計算（オーバーフロー対策）
-    let startIndex = if (page == 0 or pageSize == 0) {
-      0;
-    } else if (page > total / pageSize) {
-      total;
-    } else {
-      page * pageSize;
-    };
-    // 安全な終了インデックス計算（オーバーフロー対策）
-    // 安全な終了インデックス計算（アンダーフロー防止）
-    let endIndex = if (startIndex > total) {
-      total;
-    } else if (startIndex == total) {
-      total;
-    } else {
-      // アンダーフロー安全な減算
-      let remainingItems = Int.abs(total - startIndex);
-      if (pageSize > remainingItems) { total } else { startIndex + pageSize };
-    };
-    let resultBuffer = Buffer.Buffer<IpInfo>(pageSize);
-
-    var i = startIndex;
-    while (i < endIndex) {
-      switch (visitBuffer.getOpt(i)) {
-        case (?item) { resultBuffer.add(item) };
-        case null { /* skip */ };
-      };
-      i += 1;
-    };
-
-    {
-      visits = Buffer.toArray(resultBuffer);
-      totalPages = totalPages;
-      currentPage = page;
-      totalItems = total;
-    };
-  };
-
-  // 全ての訪問記録を取得（大量データ対応）
-  public query func getAllVisits() : async [IpInfo] {
-    Buffer.toArray(visitBuffer);
-  };
-
   // 効率的な統計情報計算（キャッシュ付き）
   public query func getStats() : async {
     totalVisits : Nat;
@@ -628,28 +470,6 @@ actor class IpAddressBackend(localMode : Bool) = this {
       totalVisits = visitBuffer.size();
       uniqueCountries = uniqueCountriesCache.size();
     };
-  };
-
-  // 国別統計の詳細情報
-  public query func getCountryStats() : async [(Text, Nat)] {
-    if (cacheInvalidated) {
-      updateCountriesCache();
-    };
-
-    // 国別の訪問数をカウント
-    var countryStats : [(Text, Nat)] = [];
-
-    for (country in uniqueCountriesCache.vals()) {
-      var count = 0;
-      for (visit in visitBuffer.vals()) {
-        if (visit.country == country) {
-          count += 1;
-        };
-      };
-      countryStats := Array.append(countryStats, [(country, count)]);
-    };
-
-    countryStats;
   };
 
   // プライベート関数：国別キャッシュの更新
@@ -668,29 +488,6 @@ actor class IpAddressBackend(localMode : Bool) = this {
 
     uniqueCountriesCache := countries;
     cacheInvalidated := false;
-  };
-
-  // データクリア機能（管理用）
-  public func clearAllData() : async Bool {
-    visitBuffer.clear();
-    totalVisitsCount := 0;
-    uniqueCountriesCache := [];
-    cacheInvalidated := true;
-    Debug.print("全データをクリアしました");
-    true;
-  };
-
-  // メモリ使用状況の取得
-  public query func getMemoryStats() : async {
-    totalVisits : Nat;
-    bufferCapacity : Nat;
-    uniqueCountries : Nat;
-  } {
-    {
-      totalVisits = visitBuffer.size();
-      bufferCapacity = visitBuffer.capacity();
-      uniqueCountries = uniqueCountriesCache.size();
-    };
   };
 
   // システム情報
@@ -732,4 +529,65 @@ actor class IpAddressBackend(localMode : Bool) = this {
       #err("Request failed");
     };
   };
+
+  // HTTPリクエストからクライアントIPアドレスを取得
+  public func getClientIpFromRequest() : async Result.Result<Text, Text> {
+    // ICPでは、IC0インターフェイスを通じてリクエスト情報にアクセスできます
+    // ただし、この機能は制限されているため、代替手段を使用します
+
+    // 注意: ICPのFullOnChainでは、直接的なクライアントIP取得は技術的に困難です
+    // 以下のアプローチが考えられます：
+
+    // 1. フロントエンドからIPアドレスを明示的に送信してもらう
+    // 2. WebRTCを使用してクライアント側でIPを取得し、それをcanisterに送信
+    // 3. 外部サービス（STUN server）を使用
+
+    #err("FullOnChainではクライアントIPの直接取得は不可能です。フロントエンドから明示的に送信する必要があります。");
+  };
+
+  // クライアントから送信されたIPアドレスで訪問を記録
+  public func recordVisitFromClient(clientIp : Text) : async Result.Result<IpInfo, Text> {
+    try {
+      // IPアドレスの基本的な検証
+      if (clientIp == "" or not isValidIpAddress(clientIp)) {
+        return #err("無効なIPアドレスです: " # clientIp);
+      };
+
+      // IP情報を取得して記録
+      let recordResult = await recordVisitByIp(clientIp);
+      switch (recordResult) {
+        case (#ok(_)) {
+          // 記録された最新情報を返す
+          let visits = getLatestVisits(1);
+          let latestVisits = await visits;
+          if (latestVisits.size() > 0) {
+            #ok(latestVisits[0]);
+          } else {
+            #err("記録後の取得に失敗");
+          };
+        };
+        case (#err(msg)) { #err("記録失敗: " # msg) };
+      };
+    } catch (_) {
+      #err("処理中にエラーが発生しました");
+    };
+  };
+
+  // 簡単なIPアドレス検証
+  private func isValidIpAddress(ip : Text) : Bool {
+    // IPv4の基本的な検証（xxx.xxx.xxx.xxx形式）
+    let parts = Text.split(ip, #char '.');
+    var partCount = 0;
+
+    for (part in parts) {
+      partCount += 1;
+      if (partCount > 4) return false;
+
+      // 各部分が数字かどうかの簡単なチェック
+      if (Text.size(part) == 0 or Text.size(part) > 3) return false;
+    };
+
+    partCount == 4;
+  };
+
 };

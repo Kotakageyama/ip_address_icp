@@ -1,57 +1,186 @@
 .current-visitor {
-	background: rgba(255, 255, 255, 0.95);
-	backdrop-filter: blur(10px);
-	border-radius: 20px;
-	padding: 30px;
-	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-	border: 1px solid rgba(255, 255, 255, 0.2);
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	border-radius: 15px;
+	padding: 1.5rem;
+	color: white;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
 .current-visitor h2 {
-	font-size: 1.4rem;
-	margin-bottom: 20px;
-	color: #2c3e50;
-	font-weight: 500;
+	margin: 0 0 1rem 0;
+	font-size: 1.5rem;
+	font-weight: 600;
 }
 
-.visitor-info-card {
-	background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
-	color: white;
-	padding: 25px;
-	border-radius: 15px;
-	box-shadow: 0 4px 15px rgba(116, 185, 255, 0.3);
-}
-
-.visitor-info-grid {
+.visitor-info {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-	gap: 15px;
-	margin-top: 15px;
+	gap: 0.75rem;
 }
 
-.visitor-info-item {
-	background: rgba(255, 255, 255, 0.1);
-	padding: 15px;
-	border-radius: 10px;
-	border: 1px solid rgba(255, 255, 255, 0.2);
+.info-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0.5rem 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.visitor-info-label {
-	font-size: 0.9rem;
+.info-row:last-child {
+	border-bottom: none;
+}
+
+.info-label {
+	font-weight: 500;
+	opacity: 0.9;
+}
+
+.info-value {
+	font-weight: 600;
+	text-align: right;
+}
+
+.loading-message {
+	text-align: center;
 	opacity: 0.8;
-	margin-bottom: 5px;
+	font-style: italic;
 }
 
-.visitor-info-value {
-	font-size: 1.1rem;
+.error-message {
+	color: #ff6b6b;
+	text-align: center;
 	font-weight: 500;
 }
 
-.loading {
-	text-align: center;
-	padding: 20px;
-	font-style: italic;
-	color: rgba(255, 255, 255, 0.8);
+/* IP入力モーダルのスタイル */
+.modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.7);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	z-index: 1000;
+}
+
+.modal-content {
+	background: white;
+	border-radius: 12px;
+	padding: 2rem;
+	max-width: 400px;
+	width: 90%;
+	max-height: 90vh;
+	overflow-y: auto;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h3 {
+	margin: 0 0 1rem 0;
+	color: #333;
+	font-size: 1.5rem;
+	font-weight: 600;
+}
+
+.modal-content p {
+	margin: 0 0 1rem 0;
+	color: #666;
+	line-height: 1.5;
+}
+
+.ip-help {
+	background: #f8f9fa;
+	padding: 0.75rem;
+	border-radius: 6px;
+	margin: 1rem 0;
+}
+
+.ip-help a {
+	color: #007bff;
+	text-decoration: none;
+	font-weight: 500;
+}
+
+.ip-help a:hover {
+	text-decoration: underline;
+}
+
+.input-group {
+	margin: 1.5rem 0;
+}
+
+.input-group label {
+	display: block;
+	margin-bottom: 0.5rem;
+	color: #333;
+	font-weight: 500;
+}
+
+.input-group input {
+	width: 100%;
+	padding: 0.75rem;
+	border: 2px solid #ddd;
+	border-radius: 6px;
+	font-size: 1rem;
+	transition: border-color 0.3s ease;
+}
+
+.input-group input:focus {
+	outline: none;
+	border-color: #007bff;
+	box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.input-group input:invalid {
+	border-color: #dc3545;
+}
+
+.error-text {
+	display: block;
+	color: #dc3545;
+	font-size: 0.875rem;
+	margin-top: 0.5rem;
+}
+
+.modal-buttons {
+	display: flex;
+	gap: 1rem;
+	justify-content: flex-end;
+	margin-top: 2rem;
+}
+
+.modal-buttons button {
+	padding: 0.75rem 1.5rem;
+	border: none;
+	border-radius: 6px;
+	font-size: 1rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.3s ease;
+}
+
+.cancel-btn {
+	background: #6c757d;
+	color: white;
+}
+
+.cancel-btn:hover {
+	background: #5a6268;
+}
+
+.submit-btn {
+	background: #007bff;
+	color: white;
+}
+
+.submit-btn:hover {
+	background: #0056b3;
+}
+
+.submit-btn:disabled {
+	background: #6c757d;
+	cursor: not-allowed;
 }
 
 /* レスポンシブデザイン */
