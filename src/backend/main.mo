@@ -79,6 +79,12 @@ actor class IpAddressBackend(localMode : Bool) = this {
     visitBuffer := Buffer.fromArray<IpInfo>(stableVisits);
     totalVisitsCount := visitBuffer.size();
     cacheInvalidated := true;
+
+    // localModeの場合は初期テストデータを生成
+    if (localMode and visitBuffer.size() == 0) {
+      generateInitialTestData();
+    };
+
     Debug.print("Postupgrade: " # Int.toText(totalVisitsCount) # " 件のデータを復元しました");
   };
 
@@ -134,6 +140,28 @@ actor class IpAddressBackend(localMode : Bool) = this {
   // IPアドレスから自動的に情報を取得して記録
   public func recordVisitByIp(ip : Text) : async Result.Result<Bool, Text> {
     try {
+      // localModeの場合はテストデータを使用
+      if (localMode) {
+        let testIpInfo : IpInfo = {
+          ip = ip;
+          country = "日本";
+          region = "東京都";
+          city = "渋谷区";
+          latitude = "35.6762";
+          longitude = "139.6503";
+          timezone = "Asia/Tokyo";
+          isp = "Test ISP";
+          timestamp = Time.now();
+        };
+
+        visitBuffer.add(testIpInfo);
+        totalVisitsCount += 1;
+        cacheInvalidated := true;
+
+        Debug.print("テストモード: 新しい訪問を記録: " # testIpInfo.country # " から " # testIpInfo.ip);
+        return #ok(true);
+      };
+
       // IPv6をサポートするipapi.coを使用してIP情報を取得
       let request : HttpRequestArgs = {
         url = "https://ipapi.co/" # ip # "/json/";
@@ -210,6 +238,15 @@ actor class IpAddressBackend(localMode : Bool) = this {
     markers : ?[Marker],
   ) : async Result.Result<Text, Text> {
     try {
+      // localModeの場合はテスト画像のBase64データを返す
+      if (localMode) {
+        // 小さなテスト用のPNG画像（1x1ピクセルの透明画像）のBase64
+        let testImageBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        let dataUrl = "data:image/png;base64," # testImageBase64;
+        Debug.print("テストモード: 静的マップを返しました");
+        return #ok(dataUrl);
+      };
+
       let zoomValue = switch (zoom) {
         case (?z) { Nat8.toNat(z) };
         case null { 14 };
@@ -498,6 +535,12 @@ actor class IpAddressBackend(localMode : Bool) = this {
   // クライアントのグローバルIPアドレスを取得（ipifyを利用）
   public func fetchGlobalIp() : async Result.Result<Text, Text> {
     try {
+      // localModeの場合はテストIPアドレスを返す
+      if (localMode) {
+        Debug.print("テストモード: テストIPアドレスを返しました");
+        return #ok("192.168.1.100");
+      };
+
       let request : HttpRequestArgs = {
         url = "https://api64.ipify.org?format=json";
         max_response_bytes = ?200;
@@ -548,6 +591,28 @@ actor class IpAddressBackend(localMode : Bool) = this {
   // クライアントから送信されたIPアドレスで訪問を記録
   public func recordVisitFromClient(clientIp : Text) : async Result.Result<IpInfo, Text> {
     try {
+      // localModeの場合はテストデータを直接返す
+      if (localMode) {
+        let testIpInfo : IpInfo = {
+          ip = clientIp;
+          country = "日本";
+          region = "東京都";
+          city = "渋谷区";
+          latitude = "35.6762";
+          longitude = "139.6503";
+          timezone = "Asia/Tokyo";
+          isp = "Test ISP";
+          timestamp = Time.now();
+        };
+
+        visitBuffer.add(testIpInfo);
+        totalVisitsCount += 1;
+        cacheInvalidated := true;
+
+        Debug.print("テストモード: クライアント訪問を記録: " # testIpInfo.country # " から " # testIpInfo.ip);
+        return #ok(testIpInfo);
+      };
+
       // IPアドレスの基本的な検証
       if (clientIp == "" or not isValidIpAddress(clientIp)) {
         return #err("無効なIPアドレスです: " # clientIp);
@@ -588,6 +653,70 @@ actor class IpAddressBackend(localMode : Bool) = this {
     };
 
     partCount == 4;
+  };
+
+  // localMode用の初期テストデータ生成
+  private func generateInitialTestData() {
+    Debug.print("テストモード: 初期テストデータを生成中...");
+
+    let testVisits : [IpInfo] = [
+      {
+        ip = "192.168.1.1";
+        country = "日本";
+        region = "東京都";
+        city = "新宿区";
+        latitude = "35.6896";
+        longitude = "139.6917";
+        timezone = "Asia/Tokyo";
+        isp = "Test ISP Tokyo";
+        timestamp = Time.now() - 3600_000_000_000; // 1時間前
+      },
+      {
+        ip = "10.0.0.1";
+        country = "アメリカ";
+        region = "カリフォルニア州";
+        city = "サンフランシスコ";
+        latitude = "37.7749";
+        longitude = "-122.4194";
+        timezone = "America/Los_Angeles";
+        isp = "Test ISP California";
+        timestamp = Time.now() - 7200_000_000_000; // 2時間前
+      },
+      {
+        ip = "172.16.0.1";
+        country = "イギリス";
+        region = "イングランド";
+        city = "ロンドン";
+        latitude = "51.5074";
+        longitude = "-0.1278";
+        timezone = "Europe/London";
+        isp = "Test ISP London";
+        timestamp = Time.now() - 10800_000_000_000; // 3時間前
+      },
+    ];
+
+    for (visit in testVisits.vals()) {
+      visitBuffer.add(visit);
+    };
+
+    totalVisitsCount := visitBuffer.size();
+    cacheInvalidated := true;
+
+    Debug.print("テストモード: " # Int.toText(testVisits.size()) # " 件のテストデータを生成しました");
+  };
+
+  // テスト用：手動でテストデータをリセット（localModeでのみ有効）
+  public func resetTestData() : async Result.Result<Bool, Text> {
+    if (not localMode) {
+      return #err("この機能はテストモードでのみ利用可能です");
+    };
+
+    visitBuffer := Buffer.Buffer<IpInfo>(0);
+    totalVisitsCount := 0;
+    cacheInvalidated := true;
+    generateInitialTestData();
+
+    #ok(true);
   };
 
 };

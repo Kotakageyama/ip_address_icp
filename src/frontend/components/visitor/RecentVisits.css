@@ -1,100 +1,343 @@
 .recent-visits {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    padding: 30px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+	background: rgba(255, 255, 255, 0.95);
+	backdrop-filter: blur(10px);
+	border-radius: 20px;
+	padding: 30px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+	border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .recent-visits h2 {
-    font-size: 1.4rem;
-    margin-bottom: 20px;
-    color: #2c3e50;
-    font-weight: 500;
+	font-size: 1.4rem;
+	margin-bottom: 20px;
+	color: #2c3e50;
+	font-weight: 500;
 }
 
-.visits-list {
-    max-height: 400px;
-    overflow-y: auto;
+.visits-description {
+	margin-bottom: 20px;
+	padding: 15px;
+	background: rgba(52, 152, 219, 0.1);
+	border-radius: 10px;
+	border-left: 4px solid #3498db;
 }
 
+.visits-description p {
+	margin: 0;
+	color: #2c3e50;
+	font-size: 0.9rem;
+	line-height: 1.4;
+}
+
+.visits-container {
+	max-height: 500px;
+	overflow-y: auto;
+	position: relative;
+}
+
+/* ヘッダー部分 */
+.visits-header {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr 100px;
+	gap: 15px;
+	padding: 15px 20px;
+	background: rgba(52, 73, 94, 0.95);
+	color: white;
+	border-radius: 12px;
+	margin-bottom: 15px;
+	font-weight: 600;
+	font-size: 0.85rem;
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	backdrop-filter: blur(5px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header-ip,
+.header-location,
+.header-time,
+.header-risk {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+}
+
+/* 訪問アイテム */
 .visit-item {
-    background: linear-gradient(135deg, #fd79a8 0%, #e84393 100%);
-    color: white;
-    padding: 20px;
-    margin-bottom: 15px;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(253, 121, 168, 0.3);
-    transition: transform 0.3s ease;
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr 100px;
+	gap: 15px;
+	align-items: center;
+	padding: 20px;
+	margin-bottom: 12px;
+	border-radius: 15px;
+	transition: all 0.3s ease;
+	border: 2px solid transparent;
+}
+
+.visit-item.high-risk {
+	background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+	color: white;
+	box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+}
+
+.visit-item.low-risk {
+	background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+	color: white;
+	box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
 }
 
 .visit-item:hover {
-    transform: translateY(-2px);
+	transform: translateY(-2px);
+	box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
 }
 
-.visit-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
+/* IP情報 */
 .visit-ip {
-    font-size: 1.1rem;
-    font-weight: 500;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
 }
 
-.visit-time {
-    font-size: 0.9rem;
-    opacity: 0.8;
+.ip-value {
+	font-size: 1rem;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	gap: 8px;
 }
 
+.leak-indicator {
+	font-size: 1.1rem;
+}
+
+/* 位置情報 */
 .visit-location {
-    font-size: 0.95rem;
-    opacity: 0.9;
-    margin-bottom: 5px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
 }
 
-.visit-location:last-child {
-    margin-bottom: 0;
+.location-main {
+	font-size: 0.95rem;
+	font-weight: 500;
 }
 
-.loading {
-    text-align: center;
-    padding: 20px;
-    font-style: italic;
-    color: #666;
+.location-detail {
+	font-size: 0.8rem;
+	opacity: 0.8;
+}
+
+/* 時間情報 */
+.visit-time {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.time-main {
+	font-size: 0.9rem;
+	font-weight: 500;
+}
+
+.time-detail {
+	font-size: 0.75rem;
+	opacity: 0.8;
+}
+
+/* リスク情報 */
+.visit-risk {
+	display: flex;
+	justify-content: center;
+}
+
+.risk-badge {
+	padding: 8px 12px;
+	border-radius: 20px;
+	font-size: 0.8rem;
+	font-weight: 600;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.risk-badge.high {
+	background: rgba(255, 255, 255, 0.3);
+	color: white;
+	border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.risk-badge.low {
+	background: rgba(255, 255, 255, 0.3);
+	color: white;
+	border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+/* 状態表示 */
+.loading-state,
+.error-state,
+.empty-state {
+	text-align: center;
+	padding: 40px 20px;
+	color: #7f8c8d;
+}
+
+.scanning-animation {
+	font-size: 2rem;
+	animation: pulse 2s ease-in-out infinite;
+	margin-bottom: 15px;
+}
+
+.error-icon,
+.empty-icon {
+	font-size: 2rem;
+	margin-bottom: 15px;
+	display: block;
+}
+
+.error-state {
+	color: #e74c3c;
+}
+
+.empty-state {
+	color: #95a5a6;
+}
+
+.empty-state small {
+	display: block;
+	margin-top: 10px;
+	font-size: 0.85rem;
+	opacity: 0.8;
+}
+
+/* フッター */
+.visits-footer {
+	margin-top: 20px;
+	padding-top: 20px;
+	border-top: 1px solid rgba(52, 73, 94, 0.1);
+}
+
+.privacy-note {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 15px;
+	background: rgba(155, 89, 182, 0.1);
+	border-radius: 10px;
+	border-left: 4px solid #9b59b6;
+}
+
+.note-icon {
+	font-size: 1.2rem;
+	margin-top: 2px;
+}
+
+.note-text {
+	font-size: 0.85rem;
+	line-height: 1.4;
+	color: #2c3e50;
+}
+
+/* アニメーション */
+@keyframes pulse {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.1);
+		opacity: 0.7;
+	}
 }
 
 /* スクロールバーのスタイリング */
-.visits-list::-webkit-scrollbar {
-    width: 8px;
+.visits-container::-webkit-scrollbar {
+	width: 8px;
 }
 
-.visits-list::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
+.visits-container::-webkit-scrollbar-track {
+	background: rgba(0, 0, 0, 0.1);
+	border-radius: 4px;
 }
 
-.visits-list::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
+.visits-container::-webkit-scrollbar-thumb {
+	background: rgba(0, 0, 0, 0.3);
+	border-radius: 4px;
 }
 
-.visits-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.5);
+.visits-container::-webkit-scrollbar-thumb:hover {
+	background: rgba(0, 0, 0, 0.5);
 }
 
 /* レスポンシブデザイン */
 @media (max-width: 768px) {
-    .recent-visits {
-        padding: 20px;
-    }
+	.recent-visits {
+		padding: 20px;
+	}
 
-    .visit-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 5px;
-    }
+	.visits-header,
+	.visit-item {
+		grid-template-columns: 1fr;
+		gap: 10px;
+		text-align: left;
+	}
+
+	.visits-header {
+		display: none; /* モバイルではヘッダーを非表示 */
+	}
+
+	.visit-item {
+		padding: 15px;
+		border-radius: 12px;
+	}
+
+	.visit-ip,
+	.visit-location,
+	.visit-time,
+	.visit-risk {
+		border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+		padding-bottom: 8px;
+		margin-bottom: 8px;
+	}
+
+	.visit-risk {
+		border-bottom: none;
+		margin-bottom: 0;
+		justify-content: flex-start;
+	}
+
+	.ip-value::before {
+		content: "🚨 漏洩IP: ";
+		font-size: 0.8rem;
+		opacity: 0.8;
+	}
+
+	.location-main::before {
+		content: "📍 ";
+	}
+
+	.time-main::before {
+		content: "🕓 ";
+	}
+
+	.privacy-note {
+		flex-direction: column;
+		gap: 8px;
+		text-align: center;
+	}
+}
+
+@media (max-width: 480px) {
+	.recent-visits {
+		padding: 15px;
+	}
+
+	.visit-item {
+		padding: 12px;
+	}
+
+	.note-text {
+		font-size: 0.8rem;
+	}
 }
