@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => ({
 			"import.meta.env.DEV": false,
 			"import.meta.env.PROD": true,
 			"import.meta.env.VITE_IS_LOCAL_NETWORK": false,
+			"import.meta.env.VITE_LOCAL_BACKEND_HOST": "",
 		}),
 	},
 	resolve: {
