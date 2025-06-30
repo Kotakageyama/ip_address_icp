@@ -26,7 +26,7 @@ const App: React.FC = () => {
 			<div className="container">
 				<div className="loading-screen">
 					<div className="loading-spinner"></div>
-					<p>アプリケーションを初期化中...</p>
+					<p>WebRTC漏洩チェックを実行中...</p>
 				</div>
 			</div>
 		);
@@ -36,10 +36,10 @@ const App: React.FC = () => {
 		return (
 			<div className="container">
 				<div className="error-screen">
-					<h2>エラーが発生しました</h2>
+					<h2>🔒 セキュリティチェックエラー</h2>
 					<p>{error}</p>
 					<button onClick={() => window.location.reload()}>
-						再試行
+						再診断
 					</button>
 				</div>
 			</div>
