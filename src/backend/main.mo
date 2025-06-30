@@ -5,6 +5,8 @@ import Buffer "mo:base/Buffer";
 import Int "mo:base/Int";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
+import Nat8 "mo:base/Nat8";
+import Nat16 "mo:base/Nat16";
 import Blob "mo:base/Blob";
 import Result "mo:base/Result";
 import Bool "mo:base/Bool";
@@ -51,6 +53,13 @@ actor class IpAddressBackend(localMode : Bool) = this {
     timezone : Text;
     isp : Text;
     timestamp : Int;
+  };
+
+  // 静的マップのマーカー型定義
+  public type Marker = {
+    lat : Text;
+    lon : Text;
+    color : Text;
   };
 
   // アップグレード時にデータを保持するためのstable variable
@@ -321,6 +330,230 @@ actor class IpAddressBackend(localMode : Bool) = this {
         { name = "Cache-Control"; value = "public, max-age=3600" },
       ];
     };
+  };
+
+  // 静的マップ画像を取得（OpenStreetMap静的マップサービス）
+  public func getStaticMap(
+    lat : Text,
+    lon : Text,
+    zoom : ?Nat8,
+    width : ?Nat16,
+    height : ?Nat16,
+    markers : ?[Marker],
+  ) : async Result.Result<Text, Text> {
+    if (localMode) {
+      // ローカルモード時はダミーのData URLを返す
+      return #ok("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==");
+    };
+
+    try {
+      let zoomValue = switch (zoom) {
+        case (?z) { Nat8.toNat(z) };
+        case null { 14 };
+      };
+      let widthValue = switch (width) {
+        case (?w) { Nat16.toNat(w) };
+        case null { 600 };
+      };
+      let heightValue = switch (height) {
+        case (?h) { Nat16.toNat(h) };
+        case null { 400 };
+      };
+
+      // デフォルトマーカー（指定された座標に赤いマーカー）
+      let markersValue = switch (markers) {
+        case (?m) { m };
+        case null { [{ lat = lat; lon = lon; color = "red" }] };
+      };
+
+      let markerParams = buildMarkerParams(markersValue);
+
+      // StaticMap APIのURL構築
+      let url = "https://staticmap.openstreetmap.de/staticmap.php" #
+      "?center=" # lat # "," # lon #
+      "&zoom=" # Nat.toText(zoomValue) #
+      "&size=" # Nat.toText(widthValue) # "x" # Nat.toText(heightValue) #
+      "&maptype=mapnik" #
+      markerParams;
+
+      let request : HttpRequestArgs = {
+        url = url;
+        max_response_bytes = ?1048576; // 1MB制限
+        headers = [
+          { name = "User-Agent"; value = "ICP-Canister/1.0" },
+          { name = "Accept"; value = "image/png,image/jpeg,image/*" },
+        ];
+        body = null;
+        method = #get;
+        transform = ?{
+          function = transformStaticMap;
+          context = Blob.fromArray([]);
+        };
+      };
+
+      // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
+      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
+
+      if (http_response.status != 200) {
+        return #err("HTTP Error: " # Nat.toText(http_response.status));
+      };
+
+      // レスポンスサイズチェック（1MB以下）
+      let responseSize = http_response.body.size();
+      if (responseSize > 1048576) {
+        return #err("Response too large: " # Nat.toText(responseSize) # " bytes");
+      };
+
+      // Base64エンコード
+      let base64Data = encodeBase64(http_response.body);
+      let dataUrl = "data:image/png;base64," # base64Data;
+
+      #ok(dataUrl);
+
+    } catch (_) {
+      #err("Static map request failed");
+    };
+  };
+
+  // 静的マップ用のレスポンス変換関数
+  public query func transformStaticMap(
+    args : {
+      response : HttpRequestResult;
+      context : Blob;
+    }
+  ) : async HttpRequestResult {
+    if (localMode) {
+      return {
+        status = 200;
+        body = Blob.fromArray([]);
+        headers = [];
+      };
+    };
+    {
+      status = args.response.status;
+      body = args.response.body;
+      headers = [
+        { name = "Content-Type"; value = "image/png" },
+        { name = "Cache-Control"; value = "public, max-age=3600" },
+      ];
+    };
+  };
+
+  // マーカーパラメータ構築用のヘルパー関数
+  private func buildMarkerParams(markers : [Marker]) : Text {
+    if (markers.size() == 0) {
+      return "";
+    };
+
+    var params = "";
+    for (marker in markers.vals()) {
+      params := params # "&markers=" # marker.lat # "," # marker.lon # "," # marker.color;
+    };
+    params;
+  };
+
+  // シンプルなBase64エンコード実装
+  private func encodeBase64(blob : Blob) : Text {
+    let bytes = Blob.toArray(blob);
+    let base64CharsArray = [
+      'A',
+      'B',
+      'C',
+      'D',
+      'E',
+      'F',
+      'G',
+      'H',
+      'I',
+      'J',
+      'K',
+      'L',
+      'M',
+      'N',
+      'O',
+      'P',
+      'Q',
+      'R',
+      'S',
+      'T',
+      'U',
+      'V',
+      'W',
+      'X',
+      'Y',
+      'Z',
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+      'f',
+      'g',
+      'h',
+      'i',
+      'j',
+      'k',
+      'l',
+      'm',
+      'n',
+      'o',
+      'p',
+      'q',
+      'r',
+      's',
+      't',
+      'u',
+      'v',
+      'w',
+      'x',
+      'y',
+      'z',
+      '0',
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '+',
+      '/',
+    ];
+
+    var result = "";
+    var i = 0;
+
+    while (i < bytes.size()) {
+      let b1 = Nat8.toNat(bytes[i]);
+      let b2 = if (i + 1 < bytes.size()) { Nat8.toNat(bytes[i + 1]) } else { 0 };
+      let b3 = if (i + 2 < bytes.size()) { Nat8.toNat(bytes[i + 2]) } else { 0 };
+
+      let c1 = b1 / 4;
+      let c2 = ((b1 % 4) * 16) + (b2 / 16);
+      let c3 = ((b2 % 16) * 4) + (b3 / 64);
+      let c4 = b3 % 64;
+
+      result := result # Text.fromChar(base64CharsArray[c1]);
+      result := result # Text.fromChar(base64CharsArray[c2]);
+
+      if (i + 1 < bytes.size()) {
+        result := result # Text.fromChar(base64CharsArray[c3]);
+      } else {
+        result := result # "=";
+      };
+
+      if (i + 2 < bytes.size()) {
+        result := result # Text.fromChar(base64CharsArray[c4]);
+      } else {
+        result := result # "=";
+      };
+
+      i := i + 3;
+    };
+
+    result;
   };
 
   // 最新の訪問記録を取得（ページング対応）

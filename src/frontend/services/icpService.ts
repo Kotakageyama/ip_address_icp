@@ -5,6 +5,7 @@ import {
 	PagedVisitsResult,
 	CountryStats,
 	MemoryStats,
+	Marker,
 } from "../types";
 
 // 環境に応じたホスト設定
@@ -49,6 +50,12 @@ const idlFactory = ({ IDL }: any) => {
 		timezone: IDL.Text,
 		isp: IDL.Text,
 		timestamp: IDL.Int,
+	});
+
+	const MarkerIDL = IDL.Record({
+		lat: IDL.Text,
+		lon: IDL.Text,
+		color: IDL.Text,
 	});
 
 	const PagedVisitsResultIDL = IDL.Record({
@@ -118,6 +125,20 @@ const idlFactory = ({ IDL }: any) => {
 		// グローバルIPアドレスをICPのOUTCALLSで取得
 		fetchGlobalIp: IDL.Func(
 			[],
+			[IDL.Variant({ ok: IDL.Text, err: IDL.Text })],
+			[]
+		),
+
+		// 静的マップ画像取得機能
+		getStaticMap: IDL.Func(
+			[
+				IDL.Text, // lat
+				IDL.Text, // lon
+				IDL.Opt(IDL.Nat8), // zoom
+				IDL.Opt(IDL.Nat16), // width
+				IDL.Opt(IDL.Nat16), // height
+				IDL.Opt(IDL.Vec(MarkerIDL)), // markers
+			],
 			[IDL.Variant({ ok: IDL.Text, err: IDL.Text })],
 			[]
 		),
@@ -385,6 +406,40 @@ export class ICPService {
 			}
 		} catch (error) {
 			console.error("グローバルIPアドレスの取得に失敗しました:", error);
+			throw error;
+		}
+	}
+
+	// 静的マップ画像を取得
+	static async getStaticMap(
+		lat: string,
+		lon: string,
+		zoom?: number,
+		width?: number,
+		height?: number,
+		markers?: Marker[]
+	): Promise<string> {
+		if (!backendActor) {
+			throw new Error("Backend Actorが初期化されていません");
+		}
+
+		try {
+			const result: ResultType<string> = await backendActor.getStaticMap(
+				lat,
+				lon,
+				zoom ? [zoom] : [],
+				width ? [width] : [],
+				height ? [height] : [],
+				markers ? [markers] : []
+			);
+
+			if ("ok" in result) {
+				return result.ok;
+			} else {
+				throw new Error(result.err);
+			}
+		} catch (error) {
+			console.error("静的マップ画像の取得に失敗しました:", error);
 			throw error;
 		}
 	}

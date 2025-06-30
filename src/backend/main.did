@@ -10,6 +10,12 @@ type IpInfo = record {
     timezone : text
 };
 
+type Marker = record {
+    lat : text;
+    lon : text;
+    color : text
+};
+
 type PagedVisitsResult = record {
     visits : vec IpInfo;
     totalPages : nat;
@@ -48,5 +54,8 @@ service : {
     // マップタイル取得機能
     fetchMapTile : (nat, nat, nat) -> (variant { ok : blob; err : text });
 
-    fetchGlobalIp : () -> async Result.Result<Text, Text>
+    // 静的マップ画像取得機能
+    getStaticMap : (text, text, opt nat8, opt nat16, opt nat16, opt vec Marker) -> (variant { ok : text; err : text });
+
+    fetchGlobalIp : () -> (variant { ok : text; err : text })
 }
