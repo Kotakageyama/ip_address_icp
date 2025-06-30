@@ -326,8 +326,20 @@ actor class IpAddressBackend(localMode : Bool) = this {
   // 最新の訪問記録を取得（ページング対応）
   public query func getLatestVisits(count : Nat) : async [IpInfo] {
     if (localMode) {
-      Debug.print("ローカルモード: マップタイルはスキップされました");
-      return [];
+      Debug.print("ローカルモード: マップタイルはテスト用を返します");
+      return [
+        {
+          ip = "127.0.0.1";
+          country = "Japan";
+          region = "Tokyo";
+          city = "Chiyoda";
+          latitude = "35.6895";
+          longitude = "139.6917";
+          timezone = "Asia/Tokyo";
+          isp = "Mock ISP";
+          timestamp = Time.now();
+        },
+      ];
     };
     let total = visitBuffer.size();
     if (total == 0) {
@@ -370,11 +382,24 @@ actor class IpAddressBackend(localMode : Bool) = this {
     totalItems : Nat;
   } {
     if (localMode) {
+      Debug.print("ローカルモード: ページングはテスト用を返します");
       return {
-        visits = [];
-        totalPages = 0;
+        visits = [
+          {
+            ip = "127.0.0.1";
+            country = "Japan";
+            region = "Tokyo";
+            city = "Chiyoda";
+            latitude = "35.6895";
+            longitude = "139.6917";
+            timezone = "Asia/Tokyo";
+            isp = "Mock ISP";
+            timestamp = Time.now();
+          },
+        ];
+        totalPages = 1;
         currentPage = page;
-        totalItems = 0;
+        totalItems = 1;
       };
     };
     let total = visitBuffer.size();
@@ -440,7 +465,19 @@ actor class IpAddressBackend(localMode : Bool) = this {
   // 全ての訪問記録を取得（大量データ対応）
   public query func getAllVisits() : async [IpInfo] {
     if (localMode) {
-      return [];
+      return [
+        {
+          ip = "127.0.0.1";
+          country = "Japan";
+          region = "Tokyo";
+          city = "Chiyoda";
+          latitude = "35.6895";
+          longitude = "139.6917";
+          timezone = "Asia/Tokyo";
+          isp = "Mock ISP";
+          timestamp = Time.now();
+        },
+      ];
     };
     Buffer.toArray(visitBuffer);
   };
@@ -452,8 +489,8 @@ actor class IpAddressBackend(localMode : Bool) = this {
   } {
     if (localMode) {
       return {
-        totalVisits = 0;
-        uniqueCountries = 0;
+        totalVisits = 1;
+        uniqueCountries = 1;
       };
     };
     // キャッシュが無効化されている場合のみ再計算
