@@ -8,8 +8,10 @@
 			"init_arg": "(false)"
 		},
 		"ip_address_frontend": {
+			"dependencies": ["ip_address_backend"],
 			"type": "assets",
-			"source": ["dist/"]
+			"source": ["dist/"],
+			"workspace": "ip_address_frontend"
 		}
 	},
 	"networks": {

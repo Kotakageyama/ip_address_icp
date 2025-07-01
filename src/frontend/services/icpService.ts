@@ -1,9 +1,8 @@
 import { HttpAgent } from "@dfinity/agent";
 import { IpInfo, Stats, Marker } from "../types";
 // 生成された型定義をインポート
-import { createActor } from "../../declarations/ip_address_backend";
+import { ip_address_backend } from "../../declarations/ip_address_backend";
 import type {
-	_SERVICE,
 	IpInfo as GeneratedIpInfo,
 	Marker as GeneratedMarker,
 } from "../../declarations/ip_address_backend/ip_address_backend.did";
@@ -67,17 +66,6 @@ const canisterId =
 
 console.log("Using canister ID:", canisterId);
 
-// 生成された型定義を使用してActorインスタンスを作成
-let backendActor: _SERVICE | null = null;
-
-try {
-	backendActor = createActor(canisterId, {
-		agent,
-	});
-} catch (error) {
-	console.warn("Backend Actorの初期化に失敗しました:", error);
-}
-
 // 型変換ユーティリティ関数
 const convertGeneratedIpInfoToIpInfo = (
 	generated: GeneratedIpInfo
@@ -102,12 +90,10 @@ const convertMarkerToGeneratedMarker = (marker: Marker): GeneratedMarker => ({
 export class ICPService {
 	// クライアントから送信されたIPアドレスで訪問を記録
 	static async recordVisitFromClient(clientIp: string): Promise<IpInfo> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
-			const result = await backendActor.recordVisitFromClient(clientIp);
+			const result = await ip_address_backend.recordVisitFromClient(
+				clientIp
+			);
 
 			if ("ok" in result) {
 				return convertGeneratedIpInfoToIpInfo(result.ok);
@@ -124,12 +110,10 @@ export class ICPService {
 	}
 
 	static async getLatestVisits(count: number): Promise<IpInfo[]> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
-			const visits = await backendActor.getLatestVisits(BigInt(count));
+			const visits = await ip_address_backend.getLatestVisits(
+				BigInt(count)
+			);
 			return visits.map(convertGeneratedIpInfoToIpInfo);
 		} catch (error) {
 			console.error("最近の訪問記録の取得に失敗しました:", error);
@@ -138,12 +122,8 @@ export class ICPService {
 	}
 
 	static async getStats(): Promise<Stats> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
-			const stats = await backendActor.getStats();
+			const stats = await ip_address_backend.getStats();
 			return {
 				totalVisits: stats.totalVisits,
 				uniqueCountries: stats.uniqueCountries,
@@ -155,12 +135,8 @@ export class ICPService {
 	}
 
 	static async whoami(): Promise<string> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
-			const result = await backendActor.whoami();
+			const result = await ip_address_backend.whoami();
 			return result;
 		} catch (error) {
 			console.error("Whoami呼び出しに失敗しました:", error);
@@ -169,7 +145,7 @@ export class ICPService {
 	}
 
 	static isAvailable(): boolean {
-		return backendActor !== null;
+		return ip_address_backend !== null;
 	}
 
 	static getCanisterId(): string {
@@ -189,16 +165,12 @@ export class ICPService {
 		height?: number,
 		markers?: Marker[]
 	): Promise<string> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
 			const convertedMarkers = markers?.map(
 				convertMarkerToGeneratedMarker
 			);
 
-			const result = await backendActor.getStaticMap(
+			const result = await ip_address_backend.getStaticMap(
 				lat,
 				lon,
 				zoom ? [zoom] : [],
