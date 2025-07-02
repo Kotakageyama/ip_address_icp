@@ -102,10 +102,16 @@ actor class IpAddressBackend(localMode : Bool) = this {
       context : Blob;
     }
   ) : async HttpRequestResult {
+    // より厳密にレスポンスを正規化
+    let headers = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Cache-Control"; value = "no-cache" },
+    ];
+
     {
       status = args.response.status;
       body = args.response.body;
-      headers = []; // ヘッダーは除外してコンセンサスを容易にする
+      headers = headers; // 一貫したヘッダーを設定
     };
   };
 
@@ -162,31 +168,19 @@ actor class IpAddressBackend(localMode : Bool) = this {
         return #ok(testIpInfo);
       };
 
-      // 元のIPを使用してIPアドレス情報を取得
-      let request : HttpRequestArgs = {
-        url = "https://ipapi.co/" # originalIp # "/json/";
-        max_response_bytes = ?2000; // 2KB制限
-        headers = [
-          { name = "User-Agent"; value = "ICP-Canister/1.0" },
-          { name = "Accept"; value = "application/json" },
-        ];
-        body = null;
-        method = #get;
-        transform = ?{
-          function = transform;
-          context = Blob.fromArray([]);
+      Debug.print("HTTPS Outcall開始: " # originalIp # " -> " # maskedIp);
+
+      // フォールバック機能付きでIPアドレス情報を取得
+      let apiResult = await fetchIpInfoWithFallback(originalIp);
+      let decoded_text = switch (apiResult) {
+        case (#ok(text)) {
+          Debug.print("IPアドレス情報取得成功: " # Nat.toText(Text.size(text)) # " bytes");
+          text;
         };
-      };
-
-      // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
-      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
-      if (http_response.status != 200) {
-        return #err("HTTP Error: " # Nat.toText(http_response.status));
-      };
-
-      let decoded_text : Text = switch (Text.decodeUtf8(http_response.body)) {
-        case (null) { return #err("Failed to decode response") };
-        case (?text) { text };
+        case (#err(errorMsg)) {
+          Debug.print("IPアドレス情報取得失敗: " # errorMsg);
+          return #err(errorMsg);
+        };
       };
 
       // JSON応答をパースしてIP情報を作成（マスクされたIPを使用）
@@ -199,8 +193,11 @@ actor class IpAddressBackend(localMode : Bool) = this {
       let timezone = extractJsonValue(decoded_text, "timezone");
       let org = extractJsonValue(decoded_text, "org");
 
+      Debug.print("JSON解析結果: country=" # country);
+
       if (country == "") {
-        return #err("Invalid JSON response");
+        Debug.print("無効なJSON応答");
+        return #err("Invalid JSON response: " # decoded_text);
       };
 
       let ipInfo : IpInfo = {
@@ -223,8 +220,10 @@ actor class IpAddressBackend(localMode : Bool) = this {
       Debug.print("新しい訪問を記録（マスク版）: " # ipInfo.country # " から " # ipInfo.ip);
       #ok(ipInfo);
 
-    } catch (_) {
-      #err("Request failed");
+    } catch (_error) {
+      let errorMsg = "HTTPSアウトコール処理中にエラーが発生しました";
+      Debug.print(errorMsg);
+      #err(errorMsg);
     };
   };
 
@@ -269,8 +268,8 @@ actor class IpAddressBackend(localMode : Bool) = this {
         };
       };
 
-      // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
-      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
+      // HTTPリクエストを実行（HTTPS outcall用に約100M cyclsを追加）
+      let http_response : HttpRequestResult = await (with cycles = 100_000_000) httpRequest(request);
       if (http_response.status != 200) {
         return #err("HTTP Error: " # Nat.toText(http_response.status));
       };
@@ -384,9 +383,9 @@ actor class IpAddressBackend(localMode : Bool) = this {
         };
       };
 
-      // HTTPリクエストを実行（HTTPS outcall用に約50M cyclsを追加）
+      // HTTPリクエストを実行（HTTPS outcall用に約100M cyclsを追加）
       Debug.print("Static map request URL: " # url);
-      let http_response : HttpRequestResult = await (with cycles = 50_000_000) httpRequest(request);
+      let http_response : HttpRequestResult = await (with cycles = 100_000_000) httpRequest(request);
 
       Debug.print("Static map response status: " # Nat.toText(http_response.status));
       if (http_response.status != 200) {
@@ -799,6 +798,58 @@ actor class IpAddressBackend(localMode : Bool) = this {
     generateInitialTestData();
 
     #ok(true);
+  };
+
+  // 複数のIPアドレス情報取得APIを試行する関数
+  private func fetchIpInfoWithFallback(ip : Text) : async Result.Result<Text, Text> {
+    // 複数のIPアドレス情報APIエンドポイント（IPv6対応）
+    let apis = [
+      "https://ipapi.co/" # ip # "/json/",
+      "https://api6.ipify.org?format=json&ip=" # ip,
+      "https://api.ipgeolocation.io/ipgeo?apiKey=&ip=" # ip # "&format=json",
+    ];
+
+    for (apiUrl in apis.vals()) {
+      try {
+        Debug.print("API試行中: " # apiUrl);
+
+        let request : HttpRequestArgs = {
+          url = apiUrl;
+          max_response_bytes = ?2000;
+          headers = [
+            { name = "User-Agent"; value = "ICP-Canister/1.0" },
+            { name = "Accept"; value = "application/json" },
+            { name = "Connection"; value = "keep-alive" },
+          ];
+          body = null;
+          method = #get;
+          transform = ?{
+            function = transform;
+            context = Blob.fromArray([]);
+          };
+        };
+
+        let http_response : HttpRequestResult = await (with cycles = 100_000_000) httpRequest(request);
+
+        if (http_response.status == 200) {
+          switch (Text.decodeUtf8(http_response.body)) {
+            case (?text) {
+              Debug.print("API成功: " # apiUrl);
+              return #ok(text);
+            };
+            case null {
+              Debug.print("API応答デコード失敗: " # apiUrl);
+            };
+          };
+        } else {
+          Debug.print("API HTTPエラー: " # apiUrl # " - Status: " # Nat.toText(http_response.status));
+        };
+      } catch (_error) {
+        Debug.print("API例外エラー: " # apiUrl);
+      };
+    };
+
+    #err("すべてのIPアドレス情報APIが失敗しました");
   };
 
 };

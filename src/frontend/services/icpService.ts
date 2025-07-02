@@ -1,11 +1,13 @@
 import { HttpAgent } from "@dfinity/agent";
 import { IpInfo, Stats, Marker } from "../types";
 // 生成された型定義をインポート
-import { ip_address_backend } from "../../declarations/ip_address_backend";
+import { createActor } from "../../declarations/ip_address_backend";
 import type {
 	IpInfo as GeneratedIpInfo,
 	Marker as GeneratedMarker,
+	_SERVICE,
 } from "../../declarations/ip_address_backend/ip_address_backend.did";
+import { ActorSubclass } from "@dfinity/agent";
 
 // 環境に応じたホスト設定
 const getHost = () => {
@@ -43,28 +45,54 @@ const getHost = () => {
 	return "https://icp0.io";
 };
 
+// Canister ID（本番環境のIDを使用）
+const getCanisterId = () => {
+	// 環境変数から取得を試行
+	const envCanisterId = import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND;
+	if (envCanisterId) {
+		console.log("Using canister ID from environment:", envCanisterId);
+		return envCanisterId;
+	}
+
+	// デフォルト: 本番環境のcanister ID
+	const productionCanisterId = "x7tsu-7yaaa-aaaaj-qnq5a-cai";
+	console.log("Using default production canister ID:", productionCanisterId);
+	return productionCanisterId;
+};
+
 const host = getHost();
+const canisterId = getCanisterId();
+
 console.log("Initializing agent with host:", host);
+console.log("Using canister ID:", canisterId);
 
 const agent = new HttpAgent({
 	host,
 });
 
-// ローカル開発環境では証明書を検証しない
+// ローカル開発環境でのみroot keyを取得
 if (
 	(import.meta.env.DEV && import.meta.env.MODE === "development") ||
 	import.meta.env.VITE_LOCAL_BACKEND_HOST ||
 	import.meta.env.VITE_IS_LOCAL_NETWORK === "true"
 ) {
-	agent.fetchRootKey();
+	agent.fetchRootKey().catch((err) => {
+		console.warn("Root keyの取得に失敗しました:", err);
+	});
 }
 
-// Canister ID（デプロイ後に更新が必要）
-const canisterId =
-	import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND ||
-	"x7tsu-7yaaa-aaaaj-qnq5a-cai";
+// Actorを手動で作成
+let ip_address_backend: ActorSubclass<_SERVICE>;
 
-console.log("Using canister ID:", canisterId);
+try {
+	ip_address_backend = createActor(canisterId, {
+		agent,
+	});
+	console.log("Actor created successfully");
+} catch (error) {
+	console.error("Failed to create actor:", error);
+	throw new Error(`Failed to initialize ICP backend service: ${error}`);
+}
 
 // 型変換ユーティリティ関数
 const convertGeneratedIpInfoToIpInfo = (
@@ -88,9 +116,19 @@ const convertMarkerToGeneratedMarker = (marker: Marker): GeneratedMarker => ({
 });
 
 export class ICPService {
+	// Actorが初期化されているかをチェック
+	private static checkActorInitialized(): void {
+		if (!ip_address_backend) {
+			throw new Error(
+				"ICP backend actor is not initialized. Please check your canister ID and network configuration."
+			);
+		}
+	}
+
 	// クライアントから送信されたIPアドレスで訪問を記録
 	static async recordVisitFromClient(clientIp: string): Promise<IpInfo> {
 		try {
+			this.checkActorInitialized();
 			const result = await ip_address_backend.recordVisitFromClient(
 				clientIp
 			);
@@ -111,6 +149,7 @@ export class ICPService {
 
 	static async getLatestVisits(count: number): Promise<IpInfo[]> {
 		try {
+			this.checkActorInitialized();
 			const visits = await ip_address_backend.getLatestVisits(
 				BigInt(count)
 			);
@@ -123,6 +162,7 @@ export class ICPService {
 
 	static async getStats(): Promise<Stats> {
 		try {
+			this.checkActorInitialized();
 			const stats = await ip_address_backend.getStats();
 			return {
 				totalVisits: stats.totalVisits,
@@ -136,6 +176,7 @@ export class ICPService {
 
 	static async whoami(): Promise<string> {
 		try {
+			this.checkActorInitialized();
 			const result = await ip_address_backend.whoami();
 			return result;
 		} catch (error) {
@@ -145,7 +186,7 @@ export class ICPService {
 	}
 
 	static isAvailable(): boolean {
-		return ip_address_backend !== null;
+		return ip_address_backend !== null && ip_address_backend !== undefined;
 	}
 
 	static getCanisterId(): string {
@@ -166,6 +207,7 @@ export class ICPService {
 		markers?: Marker[]
 	): Promise<string> {
 		try {
+			this.checkActorInitialized();
 			const convertedMarkers = markers?.map(
 				convertMarkerToGeneratedMarker
 			);
