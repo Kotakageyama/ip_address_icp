@@ -10,6 +10,7 @@ import Nat16 "mo:base/Nat16";
 import Blob "mo:base/Blob";
 import Result "mo:base/Result";
 import Bool "mo:base/Bool";
+import Error "mo:base/Error";
 
 actor class IpAddressBackend(localMode : Bool) = this {
   Debug.print("IpAddressBackend: LocalMode=" # Bool.toText(localMode));
@@ -39,8 +40,23 @@ actor class IpAddressBackend(localMode : Bool) = this {
   private func httpRequest(args : HttpRequestArgs) : async HttpRequestResult {
     let ic : actor {
       http_request : HttpRequestArgs -> async HttpRequestResult;
-    } = actor ("aaaaa-aa");
-    await ic.http_request(args);
+    } = actor ("aaaaa-aa"); // 管理キャニスターID
+
+    // より詳細なデバッグ情報を出力
+    Debug.print("HTTP Request URL: " # args.url);
+    Debug.print("HTTP Request Headers: " # debug_show (args.headers));
+    Debug.print("HTTP Request max_response_bytes: " # debug_show (args.max_response_bytes));
+
+    try {
+      let response = await ic.http_request(args);
+      Debug.print("HTTP Response Status: " # Nat.toText(response.status));
+      Debug.print("HTTP Response Headers: " # debug_show (response.headers));
+      Debug.print("HTTP Response Body Size: " # Nat.toText(response.body.size()));
+      response;
+    } catch (error) {
+      Debug.print("HTTP Request Error: リクエストが失敗しました");
+      throw error;
+    };
   };
   // IPアドレス情報の型定義
   public type IpInfo = {
@@ -102,17 +118,28 @@ actor class IpAddressBackend(localMode : Bool) = this {
       context : Blob;
     }
   ) : async HttpRequestResult {
+    // デバッグ情報をログ出力
+    Debug.print("Transform function called");
+    Debug.print("Original status: " # Nat.toText(args.response.status));
+    Debug.print("Original body size: " # Nat.toText(args.response.body.size()));
+    Debug.print("Original headers: " # debug_show (args.response.headers));
+
     // より厳密にレスポンスを正規化
-    let headers = [
+    let normalizedHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Cache-Control"; value = "no-cache" },
     ];
 
-    {
+    let result = {
       status = args.response.status;
       body = args.response.body;
-      headers = headers; // 一貫したヘッダーを設定
+      headers = normalizedHeaders; // 一貫したヘッダーを設定
     };
+
+    Debug.print("Transform result status: " # Nat.toText(result.status));
+    Debug.print("Transform result body size: " # Nat.toText(result.body.size()));
+
+    result;
   };
 
   // JSONから特定のフィールドの値を抽出（簡単な実装）
@@ -809,17 +836,22 @@ actor class IpAddressBackend(localMode : Bool) = this {
       "https://api.ipgeolocation.io/ipgeo?apiKey=&ip=" # ip # "&format=json",
     ];
 
+    var lastError = "";
+
     for (apiUrl in apis.vals()) {
       try {
         Debug.print("API試行中: " # apiUrl);
 
         let request : HttpRequestArgs = {
           url = apiUrl;
-          max_response_bytes = ?2000;
+          max_response_bytes = ?4000; // レスポンスサイズを増加
           headers = [
-            { name = "User-Agent"; value = "ICP-Canister/1.0" },
+            {
+              name = "User-Agent";
+              value = "Mozilla/5.0 (compatible; ICP-Canister/1.0)";
+            },
             { name = "Accept"; value = "application/json" },
-            { name = "Connection"; value = "keep-alive" },
+            { name = "Accept-Encoding"; value = "identity" }, // 圧縮を無効化
           ];
           body = null;
           method = #get;
@@ -829,27 +861,62 @@ actor class IpAddressBackend(localMode : Bool) = this {
           };
         };
 
-        let http_response : HttpRequestResult = await (with cycles = 100_000_000) httpRequest(request);
+        Debug.print("リクエスト送信開始: " # apiUrl);
+        Debug.print("使用サイクル数: 200,000,000");
+
+        let http_response : HttpRequestResult = try {
+          await (with cycles = 200_000_000) httpRequest(request);
+        } catch (httpError) {
+          Debug.print("httpRequest内でエラー発生: " # apiUrl);
+          throw httpError;
+        };
+
+        Debug.print("リクエスト完了 - Status: " # Nat.toText(http_response.status) # ", Body size: " # Nat.toText(http_response.body.size()));
 
         if (http_response.status == 200) {
           switch (Text.decodeUtf8(http_response.body)) {
             case (?text) {
-              Debug.print("API成功: " # apiUrl);
-              return #ok(text);
+              Debug.print("API成功: " # apiUrl # " - Response: " # text);
+              // ipapi.coの場合のみフル情報を期待
+              if (Text.contains(apiUrl, #text "ipapi.co")) {
+                return #ok(text);
+              } else {
+                // 他のAPIの場合は基本的な応答チェック
+                if (Text.size(text) > 5) {
+                  Debug.print("代替API成功: " # apiUrl);
+                  return #ok(text);
+                };
+              };
             };
             case null {
-              Debug.print("API応答デコード失敗: " # apiUrl);
+              lastError := "API応答デコード失敗: " # apiUrl;
+              Debug.print(lastError);
             };
           };
         } else {
-          Debug.print("API HTTPエラー: " # apiUrl # " - Status: " # Nat.toText(http_response.status));
+          lastError := "API HTTPエラー: " # apiUrl # " - Status: " # Nat.toText(http_response.status);
+          Debug.print(lastError);
+
+          // エラーレスポンスの内容も確認
+          switch (Text.decodeUtf8(http_response.body)) {
+            case (?errorText) {
+              Debug.print("エラーレスポンス内容: " # errorText);
+              lastError := lastError # " - " # errorText;
+            };
+            case null {
+              Debug.print("エラーレスポンスのデコードに失敗");
+            };
+          };
         };
-      } catch (_error) {
-        Debug.print("API例外エラー: " # apiUrl);
+      } catch (error) {
+        // Error.message()を使用してエラーメッセージを取得
+        let errorMsg = Error.message(error);
+        Debug.print("API例外エラー: " # apiUrl # " - " # errorMsg);
+        lastError := "API例外エラー: " # apiUrl # " - " # errorMsg;
       };
     };
 
-    #err("すべてのIPアドレス情報APIが失敗しました");
+    #err("すべてのIPアドレス情報APIが失敗しました。最後のエラー: " # lastError);
   };
 
 };
