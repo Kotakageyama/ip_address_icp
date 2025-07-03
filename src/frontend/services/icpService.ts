@@ -1,5 +1,13 @@
-import { Actor, HttpAgent } from "@dfinity/agent";
+import { HttpAgent } from "@dfinity/agent";
 import { IpInfo, Stats, Marker } from "../types";
+// 生成された型定義をインポート
+import { createActor } from "../../declarations/ip_address_backend";
+import type {
+	IpInfo as GeneratedIpInfo,
+	Marker as GeneratedMarker,
+	_SERVICE,
+} from "../../declarations/ip_address_backend/ip_address_backend.did";
+import { ActorSubclass } from "@dfinity/agent";
 
 // 環境に応じたホスト設定
 const getHost = () => {
@@ -33,120 +41,100 @@ const getHost = () => {
 	}
 
 	// デフォルト: 本番環境（IC mainnet）
-	console.log("Using production mode: https://ic0.io");
-	return "https://ic0.io";
+	console.log("Using production mode: https://icp0.io");
+	return "https://icp0.io";
+};
+
+// Canister ID（本番環境のIDを使用）
+const getCanisterId = () => {
+	// 環境変数から取得を試行
+	const envCanisterId = import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND;
+	if (envCanisterId) {
+		console.log("Using canister ID from environment:", envCanisterId);
+		return envCanisterId;
+	}
+
+	// デフォルト: 本番環境のcanister ID
+	const productionCanisterId = "x7tsu-7yaaa-aaaaj-qnq5a-cai";
+	console.log("Using default production canister ID:", productionCanisterId);
+	return productionCanisterId;
 };
 
 const host = getHost();
+const canisterId = getCanisterId();
+
 console.log("Initializing agent with host:", host);
+console.log("Using canister ID:", canisterId);
 
 const agent = new HttpAgent({
 	host,
 });
 
-// ローカル開発環境では証明書を検証しない
+// ローカル開発環境でのみroot keyを取得
 if (
 	(import.meta.env.DEV && import.meta.env.MODE === "development") ||
 	import.meta.env.VITE_LOCAL_BACKEND_HOST ||
 	import.meta.env.VITE_IS_LOCAL_NETWORK === "true"
 ) {
-	agent.fetchRootKey();
+	agent.fetchRootKey().catch((err) => {
+		console.warn("Root keyの取得に失敗しました:", err);
+	});
 }
 
-// Canister IDL インターフェース定義（スケーラブル版）
-const idlFactory = ({ IDL }: any) => {
-	const IpInfoIDL = IDL.Record({
-		ip: IDL.Text,
-		country: IDL.Text,
-		region: IDL.Text,
-		city: IDL.Text,
-		latitude: IDL.Text,
-		longitude: IDL.Text,
-		timezone: IDL.Text,
-		isp: IDL.Text,
-		timestamp: IDL.Int,
-	});
-
-	const MarkerIDL = IDL.Record({
-		lat: IDL.Text,
-		lon: IDL.Text,
-		color: IDL.Text,
-	});
-
-	const ResultIpInfoIDL = IDL.Variant({
-		ok: IpInfoIDL,
-		err: IDL.Text,
-	});
-
-	return IDL.Service({
-		getLatestVisits: IDL.Func([IDL.Nat], [IDL.Vec(IpInfoIDL)], ["query"]),
-		getStats: IDL.Func(
-			[],
-			[
-				IDL.Record({
-					totalVisits: IDL.Nat,
-					uniqueCountries: IDL.Nat,
-				}),
-			],
-			["query"]
-		),
-		whoami: IDL.Func([], [IDL.Text], ["query"]),
-
-		// HTTPS Outcalls関連のメソッド
-		// クライアントから送信されたIPで記録
-		recordVisitFromClient: IDL.Func([IDL.Text], [ResultIpInfoIDL], []),
-
-		// 静的マップ画像取得機能
-		getStaticMap: IDL.Func(
-			[
-				IDL.Text, // lat
-				IDL.Text, // lon
-				IDL.Opt(IDL.Nat8), // zoom
-				IDL.Opt(IDL.Nat16), // width
-				IDL.Opt(IDL.Nat16), // height
-				IDL.Opt(IDL.Vec(MarkerIDL)), // markers
-			],
-			[IDL.Variant({ ok: IDL.Text, err: IDL.Text })],
-			[]
-		),
-	});
-};
-
-// Canister ID（デプロイ後に更新が必要）
-const canisterId =
-	import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND ||
-	"x7tsu-7yaaa-aaaaj-qnq5a-cai";
-
-console.log("Using canister ID:", canisterId);
-
-// Actorインスタンスの作成
-let backendActor: any = null;
+// Actorを手動で作成
+let ip_address_backend: ActorSubclass<_SERVICE>;
 
 try {
-	backendActor = Actor.createActor(idlFactory, {
+	ip_address_backend = createActor(canisterId, {
 		agent,
-		canisterId,
 	});
+	console.log("Actor created successfully");
 } catch (error) {
-	console.warn("Backend Actorの初期化に失敗しました:", error);
+	console.error("Failed to create actor:", error);
+	throw new Error(`Failed to initialize ICP backend service: ${error}`);
 }
 
-// HTTPS Outcalls用の結果型
-type ResultType<T> = { ok: T } | { err: string };
+// 型変換ユーティリティ関数
+const convertGeneratedIpInfoToIpInfo = (
+	generated: GeneratedIpInfo
+): IpInfo => ({
+	ip: generated.ip,
+	country: generated.country,
+	region: generated.region,
+	city: generated.city,
+	latitude: generated.latitude,
+	longitude: generated.longitude,
+	timezone: generated.timezone,
+	isp: generated.isp,
+	timestamp: generated.timestamp,
+});
+
+const convertMarkerToGeneratedMarker = (marker: Marker): GeneratedMarker => ({
+	lat: marker.lat,
+	lon: marker.lon,
+	color: marker.color,
+});
 
 export class ICPService {
+	// Actorが初期化されているかをチェック
+	private static checkActorInitialized(): void {
+		if (!ip_address_backend) {
+			throw new Error(
+				"ICP backend actor is not initialized. Please check your canister ID and network configuration."
+			);
+		}
+	}
+
 	// クライアントから送信されたIPアドレスで訪問を記録
 	static async recordVisitFromClient(clientIp: string): Promise<IpInfo> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
-			const result: ResultType<IpInfo> =
-				await backendActor.recordVisitFromClient(clientIp);
+			this.checkActorInitialized();
+			const result = await ip_address_backend.recordVisitFromClient(
+				clientIp
+			);
 
 			if ("ok" in result) {
-				return result.ok;
+				return convertGeneratedIpInfoToIpInfo(result.ok);
 			} else {
 				throw new Error(result.err);
 			}
@@ -159,16 +147,13 @@ export class ICPService {
 		}
 	}
 
-	// マップタイルを取得
-
 	static async getLatestVisits(count: number): Promise<IpInfo[]> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
-			const visits = await backendActor.getLatestVisits(count);
-			return visits;
+			this.checkActorInitialized();
+			const visits = await ip_address_backend.getLatestVisits(
+				BigInt(count)
+			);
+			return visits.map(convertGeneratedIpInfoToIpInfo);
 		} catch (error) {
 			console.error("最近の訪問記録の取得に失敗しました:", error);
 			throw error;
@@ -176,13 +161,13 @@ export class ICPService {
 	}
 
 	static async getStats(): Promise<Stats> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
-			const stats = await backendActor.getStats();
-			return stats;
+			this.checkActorInitialized();
+			const stats = await ip_address_backend.getStats();
+			return {
+				totalVisits: stats.totalVisits,
+				uniqueCountries: stats.uniqueCountries,
+			};
 		} catch (error) {
 			console.error("統計情報の取得に失敗しました:", error);
 			throw error;
@@ -190,12 +175,9 @@ export class ICPService {
 	}
 
 	static async whoami(): Promise<string> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
-			const result = await backendActor.whoami();
+			this.checkActorInitialized();
+			const result = await ip_address_backend.whoami();
 			return result;
 		} catch (error) {
 			console.error("Whoami呼び出しに失敗しました:", error);
@@ -204,7 +186,7 @@ export class ICPService {
 	}
 
 	static isAvailable(): boolean {
-		return backendActor !== null;
+		return ip_address_backend !== null && ip_address_backend !== undefined;
 	}
 
 	static getCanisterId(): string {
@@ -224,18 +206,19 @@ export class ICPService {
 		height?: number,
 		markers?: Marker[]
 	): Promise<string> {
-		if (!backendActor) {
-			throw new Error("Backend Actorが初期化されていません");
-		}
-
 		try {
-			const result: ResultType<string> = await backendActor.getStaticMap(
+			this.checkActorInitialized();
+			const convertedMarkers = markers?.map(
+				convertMarkerToGeneratedMarker
+			);
+
+			const result = await ip_address_backend.getStaticMap(
 				lat,
 				lon,
 				zoom ? [zoom] : [],
 				width ? [width] : [],
 				height ? [height] : [],
-				markers ? [markers] : []
+				convertedMarkers ? [convertedMarkers] : []
 			);
 
 			if ("ok" in result) {

@@ -1,0 +1,67 @@
+type Result_2 = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: IpInfo;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: bool;
+ };
+type Marker = 
+ record {
+   color: text;
+   lat: text;
+   lon: text;
+ };
+type IpInfo = 
+ record {
+   city: text;
+   country: text;
+   ip: text;
+   isp: text;
+   latitude: text;
+   longitude: text;
+   region: text;
+   timestamp: int;
+   timezone: text;
+ };
+type IpAddressBackend = 
+ service {
+   getClientIpFromRequest: () -> (Result_2);
+   getLatestVisits: (count: nat) -> (vec IpInfo) query;
+   getStaticMap: (lat: text, lon: text, zoom: opt nat8, width: opt nat16,
+    height: opt nat16, markers: opt vec Marker) -> (Result_2);
+   getStats: () -> (record {
+                      totalVisits: nat;
+                      uniqueCountries: nat;
+                    }) query;
+   recordVisitByIp: (ip: text) -> (Result);
+   recordVisitFromClient: (clientIp: text) -> (Result_1);
+   resetTestData: () -> (Result);
+   transform: (args: record {
+                       context: blob;
+                       response: HttpRequestResult;
+                     }) -> (HttpRequestResult) query;
+   transformStaticMap: (args:
+    record {
+      context: blob;
+      response: HttpRequestResult;
+    }) -> (HttpRequestResult) query;
+   whoami: () -> (text) query;
+ };
+type HttpRequestResult = 
+ record {
+   body: blob;
+   headers: vec record {
+                  name: text;
+                  value: text;
+                };
+   status: nat;
+ };
+service : (localMode: bool) -> IpAddressBackend

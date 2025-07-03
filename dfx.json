@@ -8,6 +8,7 @@
 			"init_arg": "(false)"
 		},
 		"ip_address_frontend": {
+			"dependencies": ["ip_address_backend"],
 			"type": "assets",
 			"source": ["dist/"]
 		}
@@ -18,7 +19,7 @@
 			"type": "ephemeral"
 		},
 		"ic": {
-			"providers": ["https://ic0.io"],
+			"providers": ["https://icp0.io"],
 			"type": "persistent"
 		}
 	}
