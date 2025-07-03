@@ -7,54 +7,45 @@ import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
 import Nat8 "mo:base/Nat8";
 import Nat16 "mo:base/Nat16";
+
 import Blob "mo:base/Blob";
 import Result "mo:base/Result";
 import Bool "mo:base/Bool";
 import Error "mo:base/Error";
 
+import IC "ic:aaaaa-aa";
+
 actor class IpAddressBackend(localMode : Bool) = this {
   Debug.print("IpAddressBackend: LocalMode=" # Bool.toText(localMode));
-  // HTTPS Outcalls用の型定義
-  public type HttpRequestArgs = {
-    url : Text;
-    max_response_bytes : ?Nat64;
-    headers : [{ name : Text; value : Text }];
-    body : ?Blob;
-    method : { #get; #head; #post };
-    transform : ?{
-      function : shared query ({
-        response : HttpRequestResult;
-        context : Blob;
-      }) -> async HttpRequestResult;
-      context : Blob;
-    };
+
+  // 公式のIC管理キャニスターの型定義を使用
+  public type HttpHeader = {
+    name : Text;
+    value : Text;
   };
 
-  public type HttpRequestResult = {
-    status : Nat;
-    headers : [{ name : Text; value : Text }];
-    body : Blob;
+  public type HttpMethod = {
+    #get;
+    #head;
+    #post;
   };
 
-  // HTTPS Outcall実行用のプライベート関数
-  private func httpRequest(args : HttpRequestArgs) : async HttpRequestResult {
-    let ic : actor {
-      http_request : HttpRequestArgs -> async HttpRequestResult;
-    } = actor ("aaaaa-aa"); // 管理キャニスターID
-
-    // より詳細なデバッグ情報を出力
+  // 公式ドキュメントに基づくHTTPS Outcall実行用のプライベート関数
+  private func httpRequest(args : IC.http_request_args) : async IC.http_request_result {
+    // 詳細なデバッグ情報を出力
     Debug.print("HTTP Request URL: " # args.url);
     Debug.print("HTTP Request Headers: " # debug_show (args.headers));
     Debug.print("HTTP Request max_response_bytes: " # debug_show (args.max_response_bytes));
 
     try {
-      let response = await ic.http_request(args);
+      // 新しい構文でサイクルを付与してHTTP リクエストを実行
+      let response = await (with cycles = 230_949_972_000) IC.http_request(args);
       Debug.print("HTTP Response Status: " # Nat.toText(response.status));
       Debug.print("HTTP Response Headers: " # debug_show (response.headers));
       Debug.print("HTTP Response Body Size: " # Nat.toText(response.body.size()));
       response;
     } catch (error) {
-      Debug.print("HTTP Request Error: リクエストが失敗しました");
+      Debug.print("HTTP Request Error: " # Error.message(error));
       throw error;
     };
   };
@@ -111,51 +102,31 @@ actor class IpAddressBackend(localMode : Bool) = this {
     Debug.print("Preupgrade: " # Int.toText(stableVisits.size()) # " 件のデータを保存しました");
   };
 
-  // レスポンスの変換関数（コンセンサス用）
+  // 公式ドキュメントに基づくレスポンス変換関数（コンセンサス用）
   public query func transform(
     args : {
-      response : HttpRequestResult;
+      response : IC.http_request_result;
       context : Blob;
     }
-  ) : async HttpRequestResult {
-    // デバッグ情報をログ出力
-    Debug.print("Transform function called");
-    Debug.print("Original status: " # Nat.toText(args.response.status));
-    Debug.print("Original body size: " # Nat.toText(args.response.body.size()));
-    Debug.print("Original headers: " # debug_show (args.response.headers));
-
-    // より厳密にレスポンスを正規化
-    let normalizedHeaders = [
-      { name = "Content-Type"; value = "application/json" },
-      { name = "Cache-Control"; value = "no-cache" },
-    ];
-
-    let result = {
-      status = args.response.status;
-      body = args.response.body;
-      headers = normalizedHeaders; // 一貫したヘッダーを設定
+  ) : async IC.http_request_result {
+    // レスポンスのヘッダーを除去してコンセンサスを確保
+    {
+      args.response with headers = []; // ヘッダーは不要なので除去
     };
-
-    Debug.print("Transform result status: " # Nat.toText(result.status));
-    Debug.print("Transform result body size: " # Nat.toText(result.body.size()));
-
-    result;
   };
 
-  // JSONから特定のフィールドの値を抽出（簡単な実装）
+  // JSONから特定のフィールドの値を抽出（改良版）
   private func extractJsonValue(json : Text, field : Text) : Text {
-    let pattern = "\"" # field # "\":\"";
-    if (Text.contains(json, #text pattern)) {
-      // パターンで分割
-      let parts = Text.split(json, #text pattern);
+    // 文字列フィールドの場合（"field":"value"）
+    let stringPattern = "\"" # field # "\":\"";
+    if (Text.contains(json, #text stringPattern)) {
+      let parts = Text.split(json, #text stringPattern);
       switch (parts.next()) {
         case null { "" };
         case (?_) {
-          // 次の部分を取得
           switch (parts.next()) {
             case null { "" };
             case (?remaining) {
-              // クォートまでの部分を取得
               let endParts = Text.split(remaining, #text "\"");
               switch (endParts.next()) {
                 case null { "" };
@@ -166,7 +137,79 @@ actor class IpAddressBackend(localMode : Bool) = this {
         };
       };
     } else {
-      "";
+      // 数値フィールドの場合（"field":value）
+      let numberPattern = "\"" # field # "\":";
+      if (Text.contains(json, #text numberPattern)) {
+        extractNumberValue(json, numberPattern);
+      } else {
+        "";
+      };
+    };
+  };
+
+  // 数値フィールドの値を抽出するヘルパー関数
+  private func extractNumberValue(json : Text, pattern : Text) : Text {
+    let parts = Text.split(json, #text pattern);
+    switch (parts.next()) {
+      case null { "" };
+      case (?_) {
+        switch (parts.next()) {
+          case null { "" };
+          case (?remaining) {
+            var result = "";
+            let chars = remaining.chars();
+            var foundStart = false;
+
+            label charLoop loop {
+              switch (chars.next()) {
+                case null { break charLoop };
+                case (?ch) {
+                  if (ch == ' ' and not foundStart) {
+                    // 先頭のスペースをスキップ
+                  } else if (ch == ',' or ch == '}' or ch == '\n' or ch == '\r' or ch == ' ') {
+                    // 終了文字に到達
+                    break charLoop;
+                  } else {
+                    foundStart := true;
+                    result := result # Text.fromChar(ch);
+                  };
+                };
+              };
+            };
+            result;
+          };
+        };
+      };
+    };
+  };
+
+  // ApiIpInfo型定義に基づく複数フィールド対応パース関数
+  private func parseApiField(json : Text, fieldNames : [Text]) : Text {
+    for (fieldName in fieldNames.vals()) {
+      let value = extractJsonValue(json, fieldName);
+      if (value != "") {
+        return value;
+      };
+    };
+    "";
+  };
+
+  // 緯度経度をloc フィールド（"lat,lon"形式）からパースするヘルパー関数
+  private func parseLocationFromLoc(json : Text) : (Text, Text) {
+    let loc = extractJsonValue(json, "loc");
+    if (loc != "" and Text.contains(loc, #char ',')) {
+      let parts = Text.split(loc, #char ',');
+      switch (parts.next()) {
+        case (?lat) {
+          switch (parts.next()) {
+            case (?lon) { (lat, lon) };
+            case null { ("", "") };
+          };
+        };
+        case null { ("", "") };
+      };
+    } else {
+      ("", "");
     };
   };
 
@@ -211,20 +254,32 @@ actor class IpAddressBackend(localMode : Bool) = this {
       };
 
       // JSON応答をパースしてIP情報を作成（マスクされたIPを使用）
+      // ApiIpInfo型定義に基づく複数フィールド対応パース
       let parsedIp = maskedIp; // 元のIPではなくマスクされたIPを使用
-      let country = extractJsonValue(decoded_text, "country_name");
-      let region = extractJsonValue(decoded_text, "region");
-      let city = extractJsonValue(decoded_text, "city");
-      let latitude = extractJsonValue(decoded_text, "latitude");
-      let longitude = extractJsonValue(decoded_text, "longitude");
-      let timezone = extractJsonValue(decoded_text, "timezone");
-      let org = extractJsonValue(decoded_text, "org");
+      let country = parseApiField(decoded_text, ["country_name", "country"]);
+      let region = parseApiField(decoded_text, ["region", "regionName"]);
+      let city = parseApiField(decoded_text, ["city"]);
 
-      Debug.print("JSON解析結果: country=" # country);
+      // 緯度経度は複数形式に対応（直接フィールドまたはloc フィールドから）
+      let latitude = parseApiField(decoded_text, ["latitude", "lat"]);
+      let longitude = parseApiField(decoded_text, ["longitude", "lon"]);
+      let (locLat, locLon) = if (latitude == "" or longitude == "") {
+        parseLocationFromLoc(decoded_text);
+      } else {
+        ("", "");
+      };
+      let finalLatitude = if (latitude != "") { latitude } else { locLat };
+      let finalLongitude = if (longitude != "") { longitude } else { locLon };
+
+      let timezone = parseApiField(decoded_text, ["timezone"]);
+      let org = parseApiField(decoded_text, ["org", "isp"]);
+
+      Debug.print("JSON解析結果: country=" # country # ", region=" # region # ", city=" # city);
 
       if (country == "") {
-        Debug.print("無効なJSON応答");
-        return #err("Invalid JSON response: " # decoded_text);
+        Debug.print("無効なJSON応答 - country情報が見つかりません");
+        Debug.print("レスポンス内容: " # decoded_text);
+        return #err("Invalid JSON response: country field not found");
       };
 
       let ipInfo : IpInfo = {
@@ -232,8 +287,8 @@ actor class IpAddressBackend(localMode : Bool) = this {
         country = country;
         region = region;
         city = city;
-        latitude = latitude;
-        longitude = longitude;
+        latitude = finalLatitude;
+        longitude = finalLongitude;
         timezone = timezone;
         isp = org;
         timestamp = Time.now();
@@ -280,7 +335,7 @@ actor class IpAddressBackend(localMode : Bool) = this {
       };
 
       // IPv6をサポートするipapi.coを使用してIP情報を取得
-      let request : HttpRequestArgs = {
+      let request : IC.http_request_args = {
         url = "https://ipapi.co/" # ip # "/json/";
         max_response_bytes = ?2000; // 2KB制限
         headers = [
@@ -295,8 +350,8 @@ actor class IpAddressBackend(localMode : Bool) = this {
         };
       };
 
-      // HTTPリクエストを実行（HTTPS outcall用に約100M cyclsを追加）
-      let http_response : HttpRequestResult = await (with cycles = 100_000_000) httpRequest(request);
+      // HTTPリクエストを実行（公式ドキュメントのパターンに従う）
+      let http_response : IC.http_request_result = await httpRequest(request);
       if (http_response.status != 200) {
         return #err("HTTP Error: " # Nat.toText(http_response.status));
       };
@@ -306,18 +361,32 @@ actor class IpAddressBackend(localMode : Bool) = this {
         case (?text) { text };
       };
 
-      // JSON応答をパースしてIP情報を作成
-      let parsedIp = extractJsonValue(decoded_text, "ip");
-      let country = extractJsonValue(decoded_text, "country_name");
-      let region = extractJsonValue(decoded_text, "region");
-      let city = extractJsonValue(decoded_text, "city");
-      let latitude = extractJsonValue(decoded_text, "latitude");
-      let longitude = extractJsonValue(decoded_text, "longitude");
-      let timezone = extractJsonValue(decoded_text, "timezone");
-      let org = extractJsonValue(decoded_text, "org");
+      // JSON応答をパースしてIP情報を作成（ApiIpInfo型定義に基づく）
+      let parsedIp = parseApiField(decoded_text, ["ip", "query"]);
+      let country = parseApiField(decoded_text, ["country_name", "country"]);
+      let region = parseApiField(decoded_text, ["region", "regionName"]);
+      let city = parseApiField(decoded_text, ["city"]);
+
+      // 緯度経度は複数形式に対応（直接フィールドまたはloc フィールドから）
+      let latitude = parseApiField(decoded_text, ["latitude", "lat"]);
+      let longitude = parseApiField(decoded_text, ["longitude", "lon"]);
+      let (locLat, locLon) = if (latitude == "" or longitude == "") {
+        parseLocationFromLoc(decoded_text);
+      } else {
+        ("", "");
+      };
+      let finalLatitude = if (latitude != "") { latitude } else { locLat };
+      let finalLongitude = if (longitude != "") { longitude } else { locLon };
+
+      let timezone = parseApiField(decoded_text, ["timezone"]);
+      let org = parseApiField(decoded_text, ["org", "isp"]);
+
+      Debug.print("JSON解析結果: ip=" # parsedIp # ", country=" # country # ", region=" # region # ", city=" # city);
 
       if (parsedIp == "" or country == "") {
-        return #err("Invalid JSON response");
+        Debug.print("重要フィールドが見つかりません - ip:" # parsedIp # ", country:" # country);
+        Debug.print("レスポンス内容: " # decoded_text);
+        return #err("Invalid JSON response: missing ip or country field");
       };
 
       let ipInfo : IpInfo = {
@@ -325,8 +394,8 @@ actor class IpAddressBackend(localMode : Bool) = this {
         country = country;
         region = region;
         city = city;
-        latitude = latitude;
-        longitude = longitude;
+        latitude = finalLatitude;
+        longitude = finalLongitude;
         timezone = timezone;
         isp = org;
         timestamp = Time.now();
@@ -395,7 +464,7 @@ actor class IpAddressBackend(localMode : Bool) = this {
       "&format=png" #
       markerParams;
 
-      let request : HttpRequestArgs = {
+      let request : IC.http_request_args = {
         url = url;
         max_response_bytes = ?1048576; // 1MB制限
         headers = [
@@ -410,9 +479,9 @@ actor class IpAddressBackend(localMode : Bool) = this {
         };
       };
 
-      // HTTPリクエストを実行（HTTPS outcall用に約100M cyclsを追加）
+      // HTTPリクエストを実行（公式ドキュメントのパターンに従う）
       Debug.print("Static map request URL: " # url);
-      let http_response : HttpRequestResult = await (with cycles = 100_000_000) httpRequest(request);
+      let http_response : IC.http_request_result = await httpRequest(request);
 
       Debug.print("Static map response status: " # Nat.toText(http_response.status));
       if (http_response.status != 200) {
@@ -441,20 +510,15 @@ actor class IpAddressBackend(localMode : Bool) = this {
     };
   };
 
-  // 静的マップ用のレスポンス変換関数
+  // 静的マップ用のレスポンス変換関数（公式ドキュメントに基づく）
   public query func transformStaticMap(
     args : {
-      response : HttpRequestResult;
+      response : IC.http_request_result;
       context : Blob;
     }
-  ) : async HttpRequestResult {
+  ) : async IC.http_request_result {
     {
-      status = args.response.status;
-      body = args.response.body;
-      headers = [
-        { name = "Content-Type"; value = "image/png" },
-        { name = "Cache-Control"; value = "public, max-age=3600" },
-      ];
+      args.response with headers = []; // 画像用のヘッダーは除去してコンセンサスを確保
     };
   };
 
@@ -829,11 +893,11 @@ actor class IpAddressBackend(localMode : Bool) = this {
 
   // 複数のIPアドレス情報取得APIを試行する関数
   private func fetchIpInfoWithFallback(ip : Text) : async Result.Result<Text, Text> {
-    // 複数のIPアドレス情報APIエンドポイント（IPv6対応）
+    // 複数のIPアドレス情報APIエンドポイント（IPv6対応、APIキー不要のもののみ）
     let apis = [
       "https://ipapi.co/" # ip # "/json/",
-      "https://api6.ipify.org?format=json&ip=" # ip,
-      "https://api.ipgeolocation.io/ipgeo?apiKey=&ip=" # ip # "&format=json",
+      "https://api.iplocation.net/?ip=" # ip,
+      "https://ipwhois.app/json/" # ip,
     ];
 
     var lastError = "";
@@ -842,7 +906,7 @@ actor class IpAddressBackend(localMode : Bool) = this {
       try {
         Debug.print("API試行中: " # apiUrl);
 
-        let request : HttpRequestArgs = {
+        let request : IC.http_request_args = {
           url = apiUrl;
           max_response_bytes = ?4000; // レスポンスサイズを増加
           headers = [
@@ -862,10 +926,9 @@ actor class IpAddressBackend(localMode : Bool) = this {
         };
 
         Debug.print("リクエスト送信開始: " # apiUrl);
-        Debug.print("使用サイクル数: 200,000,000");
 
-        let http_response : HttpRequestResult = try {
-          await (with cycles = 200_000_000) httpRequest(request);
+        let http_response : IC.http_request_result = try {
+          await httpRequest(request);
         } catch (httpError) {
           Debug.print("httpRequest内でエラー発生: " # apiUrl);
           throw httpError;
@@ -877,15 +940,20 @@ actor class IpAddressBackend(localMode : Bool) = this {
           switch (Text.decodeUtf8(http_response.body)) {
             case (?text) {
               Debug.print("API成功: " # apiUrl # " - Response: " # text);
-              // ipapi.coの場合のみフル情報を期待
-              if (Text.contains(apiUrl, #text "ipapi.co")) {
-                return #ok(text);
-              } else {
-                // 他のAPIの場合は基本的な応答チェック
-                if (Text.size(text) > 5) {
-                  Debug.print("代替API成功: " # apiUrl);
+
+              // 基本的なJSON応答チェック
+              if (Text.size(text) > 10 and (Text.contains(text, #text "{") and Text.contains(text, #text "}"))) {
+                // レスポンスに基本的な地理情報が含まれているかチェック
+                if (Text.contains(text, #text "country") or Text.contains(text, #text "region") or Text.contains(text, #text "city")) {
+                  Debug.print("API成功: " # apiUrl # " - 有効な地理情報を取得");
                   return #ok(text);
+                } else {
+                  Debug.print("API警告: " # apiUrl # " - 地理情報が不完全");
+                  lastError := "API応答に地理情報が不完全: " # apiUrl;
                 };
+              } else {
+                Debug.print("API警告: " # apiUrl # " - 無効なJSON応答");
+                lastError := "無効なJSON応答: " # apiUrl;
               };
             };
             case null {
