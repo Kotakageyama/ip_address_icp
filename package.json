@@ -4,14 +4,18 @@
   "description": "ICP上でIPアドレスと位置情報を表示するFull on Chainサイト",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
+    "dev": "pnpm --filter ip-address-tracker-web dev",
+    "build": "pnpm --filter ip-address-tracker-web build",
+    "preview": "pnpm --filter ip-address-tracker-web preview",
     "start": "dfx start --background",
-    "deploy": "dfx deploy",
-    "deploy-local": "dfx deploy --network local",
-    "deploy-ic": "dfx deploy --network ic",
-    "stop": "dfx stop"
+    "deploy": "pnpm build && dfx deploy",
+    "deploy-local": "pnpm build && dfx deploy --network local",
+    "deploy-ic": "pnpm build && dfx deploy --network ic",
+    "stop": "dfx stop",
+    "web:dev": "pnpm --filter ip-address-tracker-web dev",
+    "web:build": "pnpm --filter ip-address-tracker-web build",
+    "web:lint": "pnpm --filter ip-address-tracker-web lint",
+    "web:format": "pnpm --filter ip-address-tracker-web format"
   },
   "dependencies": {
     "@dfinity/agent": "^0.19.2",
