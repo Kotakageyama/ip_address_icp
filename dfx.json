@@ -10,7 +10,7 @@
 		"ip_address_frontend": {
 			"dependencies": ["ip_address_backend"],
 			"type": "assets",
-			"source": ["dist/"]
+			"source": ["apps/web/dist/"]
 		}
 	},
 	"networks": {
