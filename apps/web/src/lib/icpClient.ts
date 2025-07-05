@@ -1,5 +1,6 @@
 import { HttpAgent, Actor } from '@dfinity/agent';
-import { Principal } from '@dfinity/principal';
+// Principal is not used, so removing it
+// import { Principal } from '@dfinity/principal';
 
 // Candid interface definition (from main.did)
 export interface IpInfo {
@@ -42,6 +43,7 @@ export interface BackendActor {
 }
 
 // IDL factory for the backend canister
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const idlFactory = ({ IDL }: any) => {
   const IpInfo = IDL.Record({
     city: IDL.Text,
@@ -97,40 +99,50 @@ const idlFactory = ({ IDL }: any) => {
 // Determine network and configuration
 const getNetworkConfig = () => {
   const isDev = import.meta.env.MODE === 'development';
-  const isLocal = window.location.hostname === 'localhost' || 
-                  window.location.hostname === '127.0.0.1' ||
-                  window.location.hostname.includes('.local');
+  const isLocal =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.includes('.local');
+  const isLocalNetwork = import.meta.env.VITE_IS_LOCAL_NETWORK === 'true';
 
   if (isDev || isLocal) {
     return {
-      host: 'http://127.0.0.1:4943',
+      host: import.meta.env.VITE_LOCAL_BACKEND_HOST || 'http://127.0.0.1:4943',
       isLocal: true,
+      isLocalNetwork,
     };
   }
 
   return {
     host: 'https://icp0.io',
     isLocal: false,
+    isLocalNetwork: false,
   };
 };
 
-// Get canister ID from environment or fallback
+// Get canister ID from environment variables
 const getCanisterId = (): string => {
-  // Try to get from environment variables first
+  const config = getNetworkConfig();
+
+  // For local development, always use local canister ID
+  if (config.isLocal) {
+    return 'uxrrr-q7777-77774-qaaaq-cai'; // Local canister ID
+  }
+
+  // For production, use canister ID from environment variables
   const canisterId = import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND;
-  
   if (canisterId) {
     return canisterId;
   }
 
-  // Fallback for local development
-  return 'rrkah-fqaaa-aaaaa-aaaaq-cai';
+  // Fallback
+  return 'uxrrr-q7777-77774-qaaaq-cai';
 };
 
 // Create and configure the ICP agent
 const createAgent = async (): Promise<HttpAgent> => {
   const config = getNetworkConfig();
-  
+
   const agent = new HttpAgent({
     host: config.host,
   });
@@ -151,6 +163,9 @@ const createAgent = async (): Promise<HttpAgent> => {
 export const createBackendActor = async (): Promise<BackendActor> => {
   const agent = await createAgent();
   const canisterId = getCanisterId();
+
+  console.log(`Creating backend actor with canister ID: ${canisterId}`);
+  console.log(`Network config:`, getNetworkConfig());
 
   return Actor.createActor(idlFactory, {
     agent,
