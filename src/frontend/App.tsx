@@ -1,13 +1,13 @@
 import React from "react";
-import Header from "./frontend/components/layout/Header";
-import CurrentVisitor from "./frontend/components/visitor/CurrentVisitor";
-import StaticMap from "./frontend/components/map/StaticMap";
-import Stats from "./frontend/components/stats/Stats";
-import RecentVisits from "./frontend/components/visitor/RecentVisits";
-import Footer from "./frontend/components/layout/Footer";
-import { useIpLocation } from "./frontend/hooks/useIpLocation";
-import { useStats } from "./frontend/hooks/useStats";
-import { ICPService } from "./frontend/services/icpService";
+import Header from "./components/layout/Header";
+import CurrentVisitor from "./components/visitor/CurrentVisitor";
+import StaticMap from "./components/map/StaticMap";
+import Stats from "./components/stats/Stats";
+import RecentVisits from "./components/visitor/RecentVisits";
+import Footer from "./components/layout/Footer";
+import { useIpLocation } from "./hooks/useIpLocation";
+import { useStats } from "./hooks/useStats";
+import { ICPService } from "./services/icpService";
 import "./App.css";
 
 const App: React.FC = () => {
