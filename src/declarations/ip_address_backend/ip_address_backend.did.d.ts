@@ -2,11 +2,6 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
-export interface HttpRequestResult {
-  'status' : bigint,
-  'body' : Uint8Array | number[],
-  'headers' : Array<{ 'value' : string, 'name' : string }>,
-}
 export interface IpAddressBackend {
   'getClientIpFromRequest' : ActorMethod<[], Result_2>,
   'getLatestVisits' : ActorMethod<[bigint], Array<IpInfo>>,
@@ -29,12 +24,12 @@ export interface IpAddressBackend {
   'recordVisitFromClient' : ActorMethod<[string], Result_1>,
   'resetTestData' : ActorMethod<[], Result>,
   'transform' : ActorMethod<
-    [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
-    HttpRequestResult
+    [{ 'context' : Uint8Array | number[], 'response' : http_request_result }],
+    http_request_result
   >,
   'transformStaticMap' : ActorMethod<
-    [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
-    HttpRequestResult
+    [{ 'context' : Uint8Array | number[], 'response' : http_request_result }],
+    http_request_result
   >,
   'whoami' : ActorMethod<[], string>,
 }
@@ -56,6 +51,12 @@ export type Result_1 = { 'ok' : IpInfo } |
   { 'err' : string };
 export type Result_2 = { 'ok' : string } |
   { 'err' : string };
+export interface http_header { 'value' : string, 'name' : string }
+export interface http_request_result {
+  'status' : bigint,
+  'body' : Uint8Array | number[],
+  'headers' : Array<http_header>,
+}
 export interface _SERVICE extends IpAddressBackend {}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

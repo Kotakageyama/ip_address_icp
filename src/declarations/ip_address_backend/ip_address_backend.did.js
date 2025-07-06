@@ -18,10 +18,11 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text });
   const Result_1 = IDL.Variant({ 'ok' : IpInfo, 'err' : IDL.Text });
-  const HttpRequestResult = IDL.Record({
+  const http_header = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
+  const http_request_result = IDL.Record({
     'status' : IDL.Nat,
     'body' : IDL.Vec(IDL.Nat8),
-    'headers' : IDL.Vec(IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text })),
+    'headers' : IDL.Vec(http_header),
   });
   const IpAddressBackend = IDL.Service({
     'getClientIpFromRequest' : IDL.Func([], [Result_2], []),
@@ -50,20 +51,20 @@ export const idlFactory = ({ IDL }) => {
         [
           IDL.Record({
             'context' : IDL.Vec(IDL.Nat8),
-            'response' : HttpRequestResult,
+            'response' : http_request_result,
           }),
         ],
-        [HttpRequestResult],
+        [http_request_result],
         ['query'],
       ),
     'transformStaticMap' : IDL.Func(
         [
           IDL.Record({
             'context' : IDL.Vec(IDL.Nat8),
-            'response' : HttpRequestResult,
+            'response' : http_request_result,
           }),
         ],
-        [HttpRequestResult],
+        [http_request_result],
         ['query'],
       ),
     'whoami' : IDL.Func([], [IDL.Text], ['query']),

@@ -1,3 +1,14 @@
+type http_request_result = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type http_header = 
+ record {
+   name: text;
+   value: text;
+ };
 type Result_2 = 
  variant {
    err: text;
@@ -44,24 +55,16 @@ type IpAddressBackend =
    recordVisitByIp: (ip: text) -> (Result);
    recordVisitFromClient: (clientIp: text) -> (Result_1);
    resetTestData: () -> (Result);
-   transform: (args: record {
-                       context: blob;
-                       response: HttpRequestResult;
-                     }) -> (HttpRequestResult) query;
+   transform: (args:
+    record {
+      context: blob;
+      response: http_request_result;
+    }) -> (http_request_result) query;
    transformStaticMap: (args:
     record {
       context: blob;
-      response: HttpRequestResult;
-    }) -> (HttpRequestResult) query;
+      response: http_request_result;
+    }) -> (http_request_result) query;
    whoami: () -> (text) query;
- };
-type HttpRequestResult = 
- record {
-   body: blob;
-   headers: vec record {
-                  name: text;
-                  value: text;
-                };
-   status: nat;
  };
 service : (localMode: bool) -> IpAddressBackend
