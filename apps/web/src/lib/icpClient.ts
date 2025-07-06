@@ -35,10 +35,10 @@ export interface BackendActor {
   getStaticMap: (
     lat: string,
     lon: string,
-    zoom?: number,
-    width?: number,
-    height?: number,
-    markers?: Marker[]
+    zoom?: [number] | [],
+    width?: [number] | [],
+    height?: [number] | [],
+    markers?: [Marker[]] | []
   ) => Promise<{ ok?: string; err?: string }>;
 }
 

@@ -31,14 +31,14 @@ function App() {
   const recordVisitMutation = useMutation({
     mutationFn: async () => {
       if (!backend) throw new Error('Backend not initialized');
-      
+
       const clientIP = await getClientIP();
       const result = await backend.recordVisitFromClient(clientIP);
-      
+
       if ('err' in result) {
         throw new Error(result.err);
       }
-      
+
       return result.ok!;
     },
     onSuccess: (ipInfo) => {
@@ -83,19 +83,20 @@ function App() {
       if (!backend || !currentIpInfo) {
         throw new Error('Backend or IP info not available');
       }
-      
+
       const result = await backend.getStaticMap(
         currentIpInfo.latitude,
         currentIpInfo.longitude,
-        8, // zoom level
-        800, // width
-        600  // height
+        [8] as [number], // zoom level (opt)
+        [800] as [number], // width (opt)
+        [600] as [number], // height (opt)
+        [] // markers (opt) - 空の配列を渡す
       );
-      
+
       if ('err' in result) {
         throw new Error(result.err);
       }
-      
+
       return result.ok!;
     },
     onSuccess: (imageUrl) => {
@@ -134,8 +135,8 @@ function App() {
             ipInfo={currentIpInfo}
             isLoading={recordVisitMutation.isPending}
             error={
-              recordVisitMutation.error 
-                ? recordVisitMutation.error.message 
+              recordVisitMutation.error
+                ? recordVisitMutation.error.message
                 : null
             }
           />
@@ -151,8 +152,8 @@ function App() {
             mapImageUrl={mapImageUrl}
             isLoading={generateMapMutation.isPending}
             error={
-              generateMapMutation.error 
-                ? generateMapMutation.error.message 
+              generateMapMutation.error
+                ? generateMapMutation.error.message
                 : null
             }
             onGenerateMap={handleGenerateMap}
