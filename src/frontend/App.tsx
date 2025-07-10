@@ -1,7 +1,7 @@
 import React from "react";
 import Header from "./components/layout/Header";
 import CurrentVisitor from "./components/visitor/CurrentVisitor";
-import StaticMap from "./components/map/StaticMap";
+// import StaticMap from "./components/map/StaticMap";
 import Stats from "./components/stats/Stats";
 import RecentVisits from "./components/visitor/RecentVisits";
 import Footer from "./components/layout/Footer";
@@ -58,7 +58,7 @@ const App: React.FC = () => {
 				/>
 
 				{/* IP漏洩が検出された場合のみマップと統計を表示 */}
-				{isPrivacySecure === false && (
+				{/* {isPrivacySecure === false && (
 					<>
 						<StaticMap
 							ipInfo={currentIpInfo}
@@ -66,7 +66,7 @@ const App: React.FC = () => {
 							height={500}
 						/>
 					</>
-				)}
+				)} */}
 				<Stats stats={stats} />
 				<RecentVisits />
 			</main>

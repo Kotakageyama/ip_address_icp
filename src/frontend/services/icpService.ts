@@ -8,77 +8,60 @@ import type {
 	_SERVICE,
 } from "../../declarations/ip_address_backend/ip_address_backend.did";
 import { ActorSubclass } from "@dfinity/agent";
+import { getHost, getCanisterId, getEnvironment } from "../constants/config";
 
-// 環境に応じたホスト設定
-const getHost = () => {
-	// デバッグ情報をログ出力
-	console.log("Environment check:", {
-		DEV: import.meta.env.DEV,
-		MODE: import.meta.env.MODE,
-		VITE_LOCAL_BACKEND_HOST: import.meta.env.VITE_LOCAL_BACKEND_HOST,
-		VITE_IS_LOCAL_NETWORK: import.meta.env.VITE_IS_LOCAL_NETWORK,
-	});
-
-	// 明示的にローカル開発環境変数が設定されている場合
-	if (import.meta.env.VITE_LOCAL_BACKEND_HOST) {
-		console.log(
-			"Using VITE_LOCAL_BACKEND_HOST:",
-			import.meta.env.VITE_LOCAL_BACKEND_HOST
-		);
-		return import.meta.env.VITE_LOCAL_BACKEND_HOST;
-	}
-
-	// 明示的にローカルネットワーク用の環境変数がある場合
-	if (import.meta.env.VITE_IS_LOCAL_NETWORK === "true") {
-		console.log("Using local network: http://localhost:4943");
-		return "http://localhost:4943";
-	}
-
-	// 開発モード（npm run dev）の場合のみローカルホストを使用
-	if (import.meta.env.DEV && import.meta.env.MODE === "development") {
-		console.log("Using development mode: http://localhost:4943");
-		return "http://localhost:4943";
-	}
-
-	// デフォルト: 本番環境（IC mainnet）
-	console.log("Using production mode: https://icp0.io");
-	return "https://icp0.io";
-};
-
-// Canister ID（本番環境のIDを使用）
-const getCanisterId = () => {
-	// 環境変数から取得を試行
-	const envCanisterId = import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND;
-	if (envCanisterId) {
-		console.log("Using canister ID from environment:", envCanisterId);
-		return envCanisterId;
-	}
-
-	// デフォルト: 本番環境のcanister ID
-	const productionCanisterId = "x7tsu-7yaaa-aaaaj-qnq5a-cai";
-	console.log("Using default production canister ID:", productionCanisterId);
-	return productionCanisterId;
-};
-
+// 環境とネットワーク設定を取得
+const environment = getEnvironment();
 const host = getHost();
-const canisterId = getCanisterId();
+const canisterId = getCanisterId("backend");
 
-console.log("Initializing agent with host:", host);
-console.log("Using canister ID:", canisterId);
+console.log("Environment configuration:", {
+	environment,
+	host,
+	canisterId,
+	DEV: import.meta.env.DEV,
+	MODE: import.meta.env.MODE,
+});
 
+// HttpAgentの初期化
 const agent = new HttpAgent({
 	host,
 });
 
-// ローカル開発環境でのみroot keyを取得
-if (
-	(import.meta.env.DEV && import.meta.env.MODE === "development") ||
-	import.meta.env.VITE_LOCAL_BACKEND_HOST ||
-	import.meta.env.VITE_IS_LOCAL_NETWORK === "true"
-) {
-	agent.fetchRootKey().catch((err) => {
-		console.warn("Root keyの取得に失敗しました:", err);
-	});
+// ローカル開発環境でのルートキー取得処理を改善
+if (environment === "local") {
+	console.log("ローカル環境: ルートキーを取得します...");
+
+	// ルートキーの取得を試行
+	const fetchRootKeyWithRetry = async (retries = 3) => {
+		for (let i = 0; i < retries; i++) {
+			try {
+				await agent.fetchRootKey();
+				console.log("ルートキーの取得に成功しました");
+				return;
+			} catch (err) {
+				console.warn(
+					`ルートキー取得試行 ${i + 1}/${retries} 失敗:`,
+					err
+				);
+				if (i === retries - 1) {
+					console.error(
+						"ルートキーの取得に失敗しました。証明書検証エラーが発生する可能性があります"
+					);
+					console.log(
+						"ローカル環境のため、dfxが正常に起動していることを確認してください"
+					);
+					console.log(
+						"解決方法: 'dfx start --clean' を実行してローカルレプリカを再起動してください"
+					);
+				}
+				// 1秒待ってリトライ
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+			}
+		}
+	};
+
+	fetchRootKeyWithRetry();
 }
 
 // Actorを手動で作成
@@ -125,6 +108,41 @@ export class ICPService {
 		}
 	}
 
+	// 証明書検証エラーかどうかを判定
+	private static isCertificateError(error: any): boolean {
+		const errorMessage = error.toString().toLowerCase();
+		return (
+			errorMessage.includes("certificate") ||
+			errorMessage.includes("signature verification") ||
+			errorMessage.includes("invalid certificate") ||
+			errorMessage.includes("root key")
+		);
+	}
+
+	// エラーメッセージを改善
+	private static formatError(error: any, operation: string): Error {
+		if (this.isCertificateError(error)) {
+			const environment = getEnvironment();
+			if (environment === "local") {
+				return new Error(
+					`証明書検証エラーが発生しました (${operation})。\n` +
+						`解決方法:\n` +
+						`1. 'dfx start --clean' でローカルレプリカを再起動\n` +
+						`2. 'dfx deploy' でCanisterを再デプロイ\n` +
+						`3. ブラウザのキャッシュをクリア\n` +
+						`元のエラー: ${error}`
+				);
+			} else {
+				return new Error(
+					`証明書検証エラーが発生しました (${operation})。\n` +
+						`ネットワーク接続を確認してください。\n` +
+						`元のエラー: ${error}`
+				);
+			}
+		}
+		return new Error(`${operation}に失敗しました: ${error}`);
+	}
+
 	// クライアントから送信されたIPアドレスで訪問を記録
 	static async recordVisitFromClient(clientIp: string): Promise<IpInfo> {
 		try {
@@ -143,7 +161,7 @@ export class ICPService {
 				"クライアントIPによる訪問記録の保存に失敗しました:",
 				error
 			);
-			throw error;
+			throw this.formatError(error, "クライアントIPによる訪問記録の保存");
 		}
 	}
 
@@ -156,7 +174,7 @@ export class ICPService {
 			return visits.map(convertGeneratedIpInfoToIpInfo);
 		} catch (error) {
 			console.error("最近の訪問記録の取得に失敗しました:", error);
-			throw error;
+			throw this.formatError(error, "最近の訪問記録の取得");
 		}
 	}
 
@@ -170,7 +188,7 @@ export class ICPService {
 			};
 		} catch (error) {
 			console.error("統計情報の取得に失敗しました:", error);
-			throw error;
+			throw this.formatError(error, "統計情報の取得");
 		}
 	}
 
@@ -181,7 +199,7 @@ export class ICPService {
 			return result;
 		} catch (error) {
 			console.error("Whoami呼び出しに失敗しました:", error);
-			throw error;
+			throw this.formatError(error, "Whoami呼び出し");
 		}
 	}
 
@@ -228,7 +246,7 @@ export class ICPService {
 			}
 		} catch (error) {
 			console.error("静的マップ画像の取得に失敗しました:", error);
-			throw error;
+			throw this.formatError(error, "静的マップ画像の取得");
 		}
 	}
 }
