@@ -1,0 +1,20 @@
+type IpInfo = record {
+  city : text;
+  country : text;
+  ip : text;
+  isp : text;
+  latitude : text;
+  longitude : text;
+  region : text;
+  timestamp : int;
+  timezone : text
+};
+
+service : {
+  getLatestVisits : (nat) -> (vec IpInfo) query;
+  getStats : () -> (record { totalVisits : nat; uniqueCountries : nat }) query;
+  whoami : () -> (text) query;
+
+  // クライアントから送信されたIPで記録（WebRTC経由）
+  recordVisitFromClient : (text) -> (variant { ok : IpInfo; err : text })
+}

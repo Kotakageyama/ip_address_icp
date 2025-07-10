@@ -10,9 +10,9 @@ WebRTC プロトコルを使用してあなたの実際の IP アドレスを検
 
 ### 前提条件
 
--   DFX (Internet Computer SDK)
--   Node.js v16 以上
--   npm
+- DFX (Internet Computer SDK)
+- Node.js v16 以上
+- npm
 
 ### インストールと実行
 
@@ -20,24 +20,25 @@ WebRTC プロトコルを使用してあなたの実際の IP アドレスを検
 # DFXローカルネットワークを起動
 dfx start --background
 
-# 依存関係をインストール
-npm install
+npm run setup
 
-# Canisterをデプロイ
-dfx deploy --network local
-
-# 開発サーバーを起動
-npm run dev
+npm start
 ```
 
 ブラウザで `http://localhost:3000` にアクセスしてください。
 
 ## 技術スタック
 
--   **フロントエンド**: React 18, TypeScript, Vite
--   **バックエンド**: Motoko, Internet Computer
--   **その他**: WebRTC, Leaflet Maps
+- **フロントエンド**: React 18, TypeScript, Vite
+- **バックエンド**: Motoko, Internet Computer
+- **その他**: WebRTC, Leaflet Maps
 
 ## ライセンス
 
 MIT License
+
+## 謝辞
+
+このリポジトリは 公式Docsにて紹介されていた[rvanasa/vite-react-motoko](https://github.com/rvanasa/vite-react-motoko/tree/main) を参考にしています。
+
+初めてのICP開発はこのリポジトリがなければできなかったと思います。本当にありがとうございました。

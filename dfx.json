@@ -1,26 +1,24 @@
 {
-	"version": 1,
-	"canisters": {
-		"ip_address_backend": {
-			"type": "motoko",
-			"main": "src/backend/main.mo",
-			"candid": "src/backend/main.did",
-			"init_arg": "(false)"
-		},
-		"ip_address_frontend": {
-			"dependencies": ["ip_address_backend"],
-			"type": "assets",
-			"source": ["dist/"]
-		}
-	},
-	"networks": {
-		"local": {
-			"bind": "127.0.0.1:4943",
-			"type": "ephemeral"
-		},
-		"ic": {
-			"providers": ["https://icp0.io"],
-			"type": "persistent"
-		}
-	}
+  "canisters": {
+    "backend": {
+      "type": "motoko",
+      "main": "backend/Backend.mo",
+      "candid": "backend/Backend.did",
+      "declarations": {
+        "node_compatibility": true
+      }
+    },
+    "frontend": {
+      "dependencies": ["backend"],
+      "type": "assets",
+      "source": ["dist/"]
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": "npm run --silent sources"
+    }
+  },
+  "output_env_file": ".env",
+  "version": 2
 }

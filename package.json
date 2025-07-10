@@ -1,50 +1,47 @@
 {
-	"name": "ip_address_icp",
-	"version": "1.0.0",
-	"description": "ICP上でIPアドレスと位置情報を表示するFull on Chainサイト",
-	"type": "module",
-	"scripts": {
-		"dev": "vite",
-		"dev:local": "DFX_NETWORK=local vite",
-		"build": "tsc && vite build",
-		"build:local": "DFX_NETWORK=local tsc && vite build",
-		"build:ic": "DFX_NETWORK=ic tsc && vite build",
-		"preview": "vite preview",
-		"start": "dfx start --background",
-		"deploy": "dfx deploy",
-		"deploy-local": "dfx deploy --network local",
-		"deploy-ic": "dfx deploy --network ic",
-		"stop": "dfx stop"
-	},
-	"dependencies": {
-		"@dfinity/agent": "^0.19.2",
-		"@dfinity/candid": "^0.19.2",
-		"@dfinity/principal": "^0.19.2",
-		"leaflet": "^1.9.4",
-		"react": "^18.2.0",
-		"react-dom": "^18.2.0"
-	},
-	"devDependencies": {
-		"@types/leaflet": "^1.9.4",
-		"@types/node": "^24.0.3",
-		"@types/react": "^18.2.15",
-		"@types/react-dom": "^18.2.7",
-		"@vitejs/plugin-react": "^4.0.3",
-		"typescript": "^5.0.2",
-		"vite": "^4.4.5"
-	},
-	"keywords": [
-		"internet-computer",
-		"icp",
-		"blockchain",
-		"web3",
-		"canister",
-		"motoko",
-		"geolocation",
-		"react",
-		"typescript",
-		"vite"
-	],
-	"author": "ICP Developer",
-	"license": "MIT"
+  "name": "ip_address_ipc",
+  "private": true,
+  "version": "1.0.0",
+  "description": "ICP上でIPアドレスと位置情報を表示するFull on Chainサイト",
+  "author": "Kota Kageyama",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "setup": "npm i && dfx canister create backend && dfx generate backend && dfx deploy",
+    "start": "run-p frontend backend",
+    "frontend": "vite --port 3000",
+    "backend": "mo-dev --generate --deploy -y",
+    "build": "tsc && vite build",
+    "test": "run-s test:backend test:frontend",
+    "test:frontend": "vitest run",
+    "test:backend": "mo-test",
+    "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\" \"backend/**/*.mo\"",
+    "sources": "mops sources",
+    "postinstall": "mops install"
+  },
+  "dependencies": {
+    "@ic-reactor/react": "^1.14.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.0.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "cross-fetch": "^4.0.0",
+    "dotenv": "^16.4.5",
+    "ic-mops": "^1.1.1",
+    "jsdom": "^22.1.0",
+    "mo-dev": "^0.13.0",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.4.1",
+    "prettier-plugin-motoko": "^0.10.1",
+    "sass": "^1.81.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.1",
+    "vite-plugin-environment": "^1.1.3",
+    "vitest": "^2.1.6"
+  }
 }
