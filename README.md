@@ -8,6 +8,12 @@ Internet Computer (ICP) 上で動作する WebRTC による IP アドレス漏�
 
 WebRTC プロトコルを使用してあなたの実際の IP アドレスを検出し、VPN やプロキシを使用していても漏洩する可能性のある情報を可視化します。
 
+## URLs
+- Frontend canister via browser
+  - https://xysua-saaaa-aaaaj-qnq5q-cai.icp0.io/
+- Backend canister via Candid interface
+  - https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=x7tsu-7yaaa-aaaaj-qnq5a-cai
+
 ## セットアップ
 
 ### 前提条件
