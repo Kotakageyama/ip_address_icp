@@ -26,9 +26,100 @@ export const ICP_CONFIG = {
 	// 本番環境のホスト - icp0.ioを使用してCSPエラーを回避
 	PRODUCTION_HOST: "https://icp0.io",
 
+	// Canister IDs
+	CANISTER_IDS: {
+		BACKEND: {
+			LOCAL: "uxrrr-q7777-77774-qaaaq-cai",
+			PRODUCTION: "x7tsu-7yaaa-aaaaj-qnq5a-cai",
+		},
+		FRONTEND: {
+			LOCAL: "uxrrr-q7777-77774-qaaaq-cai",
+			PRODUCTION: "xysua-saaaa-aaaaj-qnq5q-cai",
+		},
+	},
+
 	// デフォルトのCanister ID
 	DEFAULT_CANISTER_ID: "rdmx6-jaaaa-aaaaa-aaadq-cai",
 } as const;
+
+/**
+ * 現在の環境を判定する
+ */
+export const getEnvironment = (): "local" | "production" => {
+	// 環境変数で明示的に指定されている場合
+	if (import.meta.env.VITE_NETWORK) {
+		return import.meta.env.VITE_NETWORK === "local"
+			? "local"
+			: "production";
+	}
+
+	// DFX_NETWORK環境変数をチェック
+	if (import.meta.env.VITE_DFX_NETWORK === "local") {
+		return "local";
+	}
+
+	// 開発モードかつlocalhostを使用している場合
+	if (
+		import.meta.env.DEV &&
+		(import.meta.env.VITE_LOCAL_BACKEND_HOST === "http://localhost:4943" ||
+			import.meta.env.VITE_IS_LOCAL_NETWORK === "true")
+	) {
+		return "local";
+	}
+
+	// デフォルトは本番環境
+	return "production";
+};
+
+/**
+ * 現在の環境に応じたcanister IDを取得する
+ */
+export const getCanisterId = (
+	type: "backend" | "frontend" = "backend"
+): string => {
+	const environment = getEnvironment();
+
+	// 環境変数で直接指定されている場合は優先
+	if (
+		type === "backend" &&
+		import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND
+	) {
+		return import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_BACKEND;
+	}
+	if (
+		type === "frontend" &&
+		import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_FRONTEND
+	) {
+		return import.meta.env.VITE_CANISTER_ID_IP_ADDRESS_FRONTEND;
+	}
+
+	// 設定に基づいて決定
+	if (type === "backend") {
+		return environment === "local"
+			? ICP_CONFIG.CANISTER_IDS.BACKEND.LOCAL
+			: ICP_CONFIG.CANISTER_IDS.BACKEND.PRODUCTION;
+	} else {
+		return environment === "local"
+			? ICP_CONFIG.CANISTER_IDS.FRONTEND.LOCAL
+			: ICP_CONFIG.CANISTER_IDS.FRONTEND.PRODUCTION;
+	}
+};
+
+/**
+ * 現在の環境に応じたホストを取得する
+ */
+export const getHost = (): string => {
+	const environment = getEnvironment();
+
+	// 環境変数で直接指定されている場合は優先
+	if (import.meta.env.VITE_LOCAL_BACKEND_HOST) {
+		return import.meta.env.VITE_LOCAL_BACKEND_HOST;
+	}
+
+	return environment === "local"
+		? ICP_CONFIG.LOCAL_HOST
+		: ICP_CONFIG.PRODUCTION_HOST;
+};
 
 /**
  * UI関連の設定
