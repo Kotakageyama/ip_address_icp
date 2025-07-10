@@ -2,6 +2,8 @@
 
 Internet Computer (ICP) 上で動作する WebRTC による IP アドレス漏洩診断ツールです。
 
+<img width="1203" height="817" alt="img_IP_ICP" src="https://github.com/user-attachments/assets/5e3c45ae-5681-444e-92f5-c0563ae0d6a4" />
+
 ## 概要
 
 WebRTC プロトコルを使用してあなたの実際の IP アドレスを検出し、VPN やプロキシを使用していても漏洩する可能性のある情報を可視化します。
